@@ -3,7 +3,7 @@ import {
     StyleSheet, View, Text, TouchableOpacity, FlatList, TextInput, Platform, Dimensions, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, MapPin, Zap, Clock, ChevronRight, Star, AlertCircle } from 'lucide-react-native';
+import { Search, MapPin, Zap, Clock, ChevronRight, Star, AlertCircle, Car } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -11,7 +11,36 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import RatingModal from '../../components/feedback/RatingModal';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
 import { useThemeStore } from '../../store/themeStore';
+import { useVehicleStore, INITIAL_FAMILY } from '../../store/vehicleStore';
 import { MOCK_STATIONS } from '../../mock/stations.mock';
+import { useLanguageStore } from '../../store/languageStore';
+
+const translations = {
+    English: {
+        title: 'Find Stations',
+        nearYou: 'near you',
+        searchPlaceholder: 'Search stations or CPO…',
+        available: 'Available',
+        full: 'Full',
+        rate: 'Rate',
+        report: 'Report',
+        bookNow: 'Book Now',
+        noMatch: 'No stations match your search',
+        vehicle: 'Vehicle'
+    },
+    'हिंदी': {
+        title: 'स्टेशन खोजें',
+        nearYou: 'आपके पास',
+        searchPlaceholder: 'स्टेशन या CPO खोजें…',
+        available: 'उपलब्ध',
+        full: 'भरा हुआ',
+        rate: 'रेट',
+        report: 'रिपोर्ट',
+        bookNow: 'अभी बुक करें',
+        noMatch: 'आपकी खोज से कोई स्टेशन मेल नहीं खाता',
+        vehicle: 'वाहन'
+    }
+};
 
 const { width } = Dimensions.get('window');
 
@@ -19,8 +48,11 @@ const FILTERS = ['All', 'AC', 'DC', 'Available Now'];
 
 export default function DiscoverScreen() {
     const { theme } = useThemeStore();
+    const { language } = useLanguageStore();
+    const { familyVehicles } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
+    const t = translations[language];
 
     const [activeFilter, setActiveFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
@@ -95,7 +127,7 @@ export default function DiscoverScreen() {
                         <View style={styles.metaItem}>
                             <Zap size={13} color={statusColor} />
                             <Text style={[styles.metaText, { color: statusColor, fontWeight: '700' }]}>
-                                {item.availableChargers}/{item.totalChargers} {isAvailable ? 'Available' : 'Full'}
+                                {item.availableChargers}/{item.totalChargers} {isAvailable ? t.available : t.full}
                             </Text>
                         </View>
                     </View>
@@ -114,7 +146,7 @@ export default function DiscoverScreen() {
                         }}
                     >
                         <Star size={14} color={textSecondary} />
-                        <Text style={[styles.actionBtnText, { color: textSecondary }]}>Rate</Text>
+                        <Text style={[styles.actionBtnText, { color: textSecondary }]}>{t.rate}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -125,7 +157,7 @@ export default function DiscoverScreen() {
                         }}
                     >
                         <AlertCircle size={14} color={COLORS.alertRed} />
-                        <Text style={[styles.actionBtnText, { color: COLORS.alertRed }]}>Report</Text>
+                        <Text style={[styles.actionBtnText, { color: COLORS.alertRed }]}>{t.report}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -133,7 +165,7 @@ export default function DiscoverScreen() {
                         onPress={() => router.push('/(b2c)/booking' as any)}
                         disabled={!isAvailable}
                     >
-                        <Text style={styles.bookBtnText}>{!isAvailable ? 'Full' : 'Book Now'}</Text>
+                        <Text style={styles.bookBtnText}>{!isAvailable ? t.full : t.bookNow}</Text>
                         {isAvailable && <ChevronRight size={14} color="#000" />}
                     </TouchableOpacity>
                 </View>
@@ -144,14 +176,14 @@ export default function DiscoverScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: textPrimary }]}>Find Stations</Text>
-                <Text style={[styles.subtitle, { color: textSecondary }]}>{filtered.length} near you</Text>
+                <Text style={[styles.title, { color: textPrimary }]}>{t.title}</Text>
+                <Text style={[styles.subtitle, { color: textSecondary }]}>{filtered.length} {t.nearYou}</Text>
             </View>
 
             <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderColor }]}>
                 <Search size={16} color={textSecondary} />
                 <TextInput
-                    placeholder="Search stations or CPO…"
+                    placeholder={t.searchPlaceholder}
                     placeholderTextColor={isDark ? COLORS.textMutedDark : 'rgba(0,0,0,0.35)'}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -177,18 +209,43 @@ export default function DiscoverScreen() {
                                 }}
                                 customMapStyle={isDark ? darkMapStyle : []}
                             >
-                                {MOCK_STATIONS.map((station) => (
-                                    <Marker
-                                        key={station.id}
-                                        coordinate={station.coordinates as any}
-                                        title={station.name}
-                                        description={`${station.availableChargers}/${station.totalChargers} Available`}
-                                    >
-                                        <View style={[styles.markerContainer, { backgroundColor: COLORS.primaryGreen }]}>
-                                            <Zap size={14} color="#000" />
-                                        </View>
-                                    </Marker>
-                                ))}
+                                {MOCK_STATIONS.map((station) => {
+                                    const coords = station.coordinates || { latitude: 28.495, longitude: 77.088 };
+                                    return (
+                                        <Marker
+                                            key={`stat-${station.id}`}
+                                            coordinate={{
+                                                latitude: Number(coords.latitude),
+                                                longitude: Number(coords.longitude)
+                                            }}
+                                            title={station.name}
+                                            description={`${station.availableChargers}/${station.totalChargers} ${t.available}`}
+                                        >
+                                            <View style={[styles.markerContainer, { backgroundColor: COLORS.successGreen }]}>
+                                                <Zap size={14} color="#000" />
+                                            </View>
+                                        </Marker>
+                                    );
+                                })}
+
+                                {familyVehicles.map((vehicle, idx) => {
+                                    const coords = vehicle.coordinates || INITIAL_FAMILY[idx]?.coordinates || { latitude: 28.495, longitude: 77.088 };
+                                    return (
+                                        <Marker
+                                            key={`veh-${vehicle.id}`}
+                                            coordinate={{
+                                                latitude: Number(coords.latitude),
+                                                longitude: Number(coords.longitude)
+                                            }}
+                                            title={vehicle.memberName}
+                                            description={`${vehicle.vehicleModel} • ${vehicle.batteryLevel}%`}
+                                        >
+                                            <View style={[styles.markerContainer, { backgroundColor: COLORS.brandBlue }]}>
+                                                <Car size={14} color="#FFF" />
+                                            </View>
+                                        </Marker>
+                                    );
+                                })}
                             </MapView>
                         </View>
 
@@ -215,7 +272,7 @@ export default function DiscoverScreen() {
                 ListEmptyComponent={
                     <View style={styles.empty}>
                         <Zap size={40} color={COLORS.textMutedDark} />
-                        <Text style={[styles.emptyText, { color: textSecondary }]}>No stations match your search</Text>
+                        <Text style={[styles.emptyText, { color: textSecondary }]}>{t.noMatch}</Text>
                     </View>
                 }
             />

@@ -51,9 +51,9 @@ VoltLink is a premium, glassmorphic EV charging and fleet management application
 Ensure you have the following installed on your machine:
 
 - **Node.js** — v18 or later (LTS recommended)
-- **npm** — comes with Node.js (or use **yarn** if preferred)
-- **Expo CLI** — installed globally or used via `npx`
-- **Expo Go** app on your mobile device (for testing on a physical device)
+- **npm** — Comes with Node.js
+- **Expo Go** app — Download from the [App Store (iOS)](https://apps.apple.com/app/expo-go/id982107779) or [Google Play Store (Android)](https://play.google.com/store/apps/details?id=host.exp.exponent)
+- **Stable Internet** — High-speed connection for downloading dependencies
 - *(Optional)* Android Studio / Xcode for emulator/simulator testing
 
 ### 1. Clone the Repository
@@ -71,11 +71,35 @@ npm install
 
 ### 3. Start the Development Server
 
+Choose the mode that fits your network setup:
+
+#### **A. Same Network (Standard)**
+If your computer and mobile phone are on the **same Wi-Fi network**:
 ```bash
 npx expo start --clear
 ```
 
-This will start the Metro Bundler and display a QR code in the terminal.
+#### **B. Different Networks (Tunnel Mode)**
+If you are using **mobile data**, a different Wi-Fi, or are behind a **firewall/corporate network**, use tunnel mode:
+```bash
+npx expo start --tunnel
+```
+*Note: This might require installing the `@expo/ngrok` package if prompted.*
+
+---
+
+## 📱 Live Preview with Expo Go
+
+To see the app live on your physical device:
+
+1.  **Install Expo Go**: Ensure you have the [Expo Go](https://expo.dev/go) app installed on your phone.
+2.  **Start Server**: Run one of the commands from Step 3 above.
+3.  **Scan QR Code**:
+    *   **Android**: Open the **Expo Go** app and tap "Scan QR Code".
+    *   **iOS**: Use the default **Camera App** to scan the QR code and tap the link to open in Expo Go.
+4.  **Enjoy Preview**: The app will bundle and load automatically. Any changes you make in the code will reflect instantly on your phone!
+
+---
 
 ### 4. Run on Your Device / Emulator
 

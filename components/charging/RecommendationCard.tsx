@@ -4,6 +4,24 @@ import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../ui/GlassCard';
 import { Station } from '../../types/station.types';
 import { useThemeStore } from '../../store/themeStore';
+import { useLanguageStore } from '../../store/languageStore';
+
+const translations = {
+    English: {
+        available: 'Available',
+        ai: 'AI:',
+        rate: 'Rate',
+        report: 'Report',
+        bookNow: 'Book Now'
+    },
+    'हिंदी': {
+        available: 'उपलब्ध',
+        ai: 'AI:',
+        rate: 'रेट',
+        report: 'रिपोर्ट',
+        bookNow: 'अभी बुक करें'
+    }
+};
 
 interface RecommendationCardProps {
     recommendation: Station;
@@ -21,7 +39,9 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
     onReport
 }) => {
     const { theme } = useThemeStore();
+    const { language } = useLanguageStore();
     const isDark = theme === 'dark';
+    const t = translations[language];
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
     const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)';
@@ -42,27 +62,27 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                     {recommendation.distanceKm} km • {recommendation.etaMinutes} mins
                 </Text>
                 <Text style={styles.availability}>
-                    {recommendation.availableChargers || 0}/{recommendation.totalChargers || 0} Available
+                    {recommendation.availableChargers || 0}/{recommendation.totalChargers || 0} {t.available}
                 </Text>
             </View>
 
             <View style={styles.aiBadge}>
-                <Text style={styles.aiText}>AI: {recommendation.aiReason}</Text>
+                <Text style={styles.aiText}>{t.ai} {recommendation.aiReason}</Text>
             </View>
 
             <View style={styles.actionRow}>
                 {onRate && (
                     <TouchableOpacity style={[styles.actionBtn, { borderColor }]} onPress={onRate}>
-                        <Text style={[styles.actionText, { color: textSecondary }]}>Rate</Text>
+                        <Text style={[styles.actionText, { color: textSecondary }]}>{t.rate}</Text>
                     </TouchableOpacity>
                 )}
                 {onReport && (
                     <TouchableOpacity style={[styles.actionBtn, { borderColor }]} onPress={onReport}>
-                        <Text style={[styles.actionText, { color: COLORS.alertRed }]}>Report</Text>
+                        <Text style={[styles.actionText, { color: COLORS.alertRed }]}>{t.report}</Text>
                     </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.bookButton} onPress={onBook}>
-                    <Text style={styles.bookText}>Book Now</Text>
+                    <Text style={styles.bookText}>{t.bookNow}</Text>
                 </TouchableOpacity>
             </View>
         </GlassCard>
@@ -111,23 +131,27 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.md,
     },
     aiText: { ...TYPOGRAPHY.label, color: COLORS.brandBlue, fontSize: 11, fontStyle: 'italic' },
-    bookButton: {
-        backgroundColor: COLORS.brandBlue,
-        paddingVertical: SPACING.md,
-        borderRadius: BORDER_RADIUS.md,
+    actionBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 100,
+        borderWidth: 1,
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    bookText: { color: '#000', fontWeight: '700', fontSize: 13 },
+    bookButton: {
+        backgroundColor: COLORS.brandBlue,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 100,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    bookText: { color: '#000', fontWeight: '800', fontSize: 13 },
     actionRow: {
         flexDirection: 'row',
         gap: SPACING.sm,
-    },
-    actionBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: BORDER_RADIUS.md,
-        borderWidth: 1,
-        justifyContent: 'center',
         alignItems: 'center',
     },
     actionText: {

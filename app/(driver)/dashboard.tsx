@@ -13,11 +13,39 @@ import { useThemeStore } from '../../store/themeStore';
 import { Vehicle } from '../../types/vehicle.types';
 import { MOCK_STATIONS } from '../../mock/stations.mock';
 import { useRouter } from 'expo-router';
+import { useLanguageStore, Language } from '../../store/languageStore';
+
+const translations = {
+    English: {
+        greeting: 'Good Morning,',
+        stats: "Today's Stats",
+        distance: 'Distance',
+        kwhUsed: 'kWh Used',
+        rate: 'Rate',
+        aiRecs: 'AI Recommendations',
+        viewAll: 'View All',
+        batteryLow: 'Battery critically low',
+        tapToSee: 'Tap to see nearest chargers'
+    },
+    'हिंदी': {
+        greeting: 'शुभ प्रभात,',
+        stats: "आज के आँकड़े",
+        distance: 'दूरी',
+        kwhUsed: 'kWh उपयोग',
+        rate: 'दर',
+        aiRecs: 'AI सिफारिशें',
+        viewAll: 'सभी देखें',
+        batteryLow: 'बैटरी बहुत कम है',
+        tapToSee: 'निकटतम चार्जर देखने के लिए टैप करें'
+    }
+};
 
 const DriverDashboard = () => {
     const { theme } = useThemeStore();
+    const { language, setLanguage } = useLanguageStore();
     const isDark = theme === 'dark';
     const router = useRouter();
+    const t = translations[language];
 
     const [refreshing, setRefreshing] = useState(false);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
@@ -56,8 +84,28 @@ const DriverDashboard = () => {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={[styles.greeting, { color: textSecondary }]}>Good Morning,</Text>
-                    <Text style={[styles.name, { color: textPrimary }]}>Pavan Kalyan</Text>
+                    <View style={styles.headerTop}>
+                        <View>
+                            <Text style={[styles.greeting, { color: textSecondary }]}>{t.greeting}</Text>
+                            <Text style={[styles.name, { color: textPrimary }]}>Pavan Kalyan</Text>
+                        </View>
+                        <View style={styles.langSwitch}>
+                            {(['English', 'हिंदी'] as Language[]).map((l) => (
+                                <TouchableOpacity
+                                    key={l}
+                                    onPress={() => setLanguage(l)}
+                                    style={[
+                                        styles.langPill,
+                                        language === l && { backgroundColor: COLORS.brandBlue }
+                                    ]}
+                                >
+                                    <Text style={[styles.langText, { color: language === l ? '#000' : textSecondary }]}>
+                                        {l}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
                 </View>
 
                 {/* Low Battery Alert Banner */}
@@ -69,7 +117,7 @@ const DriverDashboard = () => {
                     >
                         <AlertTriangle size={18} color={COLORS.alertRed} />
                         <Text style={styles.alertText}>
-                            Battery critically low ({vehicle?.batteryLevel}%) — Tap to see nearest chargers
+                            {t.batteryLow} ({vehicle?.batteryLevel}%) — {t.tapToSee}
                         </Text>
                     </TouchableOpacity>
                 )}
@@ -81,16 +129,16 @@ const DriverDashboard = () => {
                     />
                 )}
 
-                <SectionHeader title="Today's Stats" />
+                <SectionHeader title={t.stats} />
                 <View style={styles.statsRow}>
-                    <MetricCard label="Distance" value={stats?.distanceKm || 0} unit="km" icon={<Route size={16} color={COLORS.brandBlue} />} />
-                    <MetricCard label="kWh Used" value={stats?.kwhConsumed || 0} unit="kWh" icon={<Zap size={16} color={COLORS.brandBlue} />} />
-                    <MetricCard label="Rate" value={`₹${stats?.costPerKwh || 0}`} unit="/kWh" icon={<DollarSign size={16} color={COLORS.brandBlue} />} />
+                    <MetricCard label={t.distance} value={stats?.distanceKm || 0} unit="km" icon={<Route size={16} color={COLORS.brandBlue} />} />
+                    <MetricCard label={t.kwhUsed} value={stats?.kwhConsumed || 0} unit="kWh" icon={<Zap size={16} color={COLORS.brandBlue} />} />
+                    <MetricCard label={t.rate} value={`₹${stats?.costPerKwh || 0}`} unit="/kWh" icon={<DollarSign size={16} color={COLORS.brandBlue} />} />
                 </View>
 
                 <SectionHeader
-                    title="AI Recommendations"
-                    actionLabel="View All"
+                    title={t.aiRecs}
+                    actionLabel={t.viewAll}
                     onActionPress={() => router.push('/(driver)/recommendations' as any)}
                 />
 
@@ -127,6 +175,10 @@ const styles = StyleSheet.create({
     },
     alertText: { ...TYPOGRAPHY.label, color: COLORS.alertRed, flex: 1, fontWeight: '600', lineHeight: 18 },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -4 },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    langSwitch: { flexDirection: 'row', gap: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 4 },
+    langPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
+    langText: { fontSize: 10, fontWeight: '800' },
 });
 
 export default DriverDashboard;

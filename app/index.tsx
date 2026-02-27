@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Animated, Dimensions, Platform } from 'react-native';
+import { StyleSheet, View, Text, Animated, Dimensions, Platform, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassButton } from '../components/ui/GlassButton';
@@ -109,27 +109,23 @@ function RoleCard({ selected, onPress, icon, title, subtitle, isDark, textPrimar
             : 'rgba(0,0,0,0.08)';
 
     const bgColor = selected
-        ? isDark ? 'rgba(4, 234, 170, 0.06)' : 'rgba(4, 234, 170, 0.05)'
-        : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)';
+        ? isDark ? 'rgba(4, 234, 170, 0.12)' : 'rgba(4, 234, 170, 0.08)'
+        : isDark ? 'rgba(255,255,255,0.04)' : 'transparent';
 
     return (
-        <View
+        <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onPress}
             style={[
                 styles.cardWrapper,
                 {
                     borderColor,
                     backgroundColor: bgColor,
-                    ...(selected && Platform.OS === 'android' ? { elevation: 6 } : {}),
-                    ...(selected && Platform.OS === 'ios' ? {
-                        shadowColor: COLORS.primaryGreen,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 12,
-                    } : {}),
+                    borderWidth: selected ? 2 : 1.5,
                 },
             ]}
         >
-            <View style={styles.cardContent} onTouchEnd={onPress}>
+            <View style={styles.cardContent}>
                 <View style={[styles.iconCircle, {
                     backgroundColor: selected
                         ? 'rgba(4, 234, 170, 0.12)'
@@ -145,7 +141,7 @@ function RoleCard({ selected, onPress, icon, title, subtitle, isDark, textPrimar
                     </View>
                 )}
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
@@ -208,7 +204,6 @@ const styles = StyleSheet.create({
     cardWrapper: {
         flex: 1,
         borderRadius: BORDER_RADIUS.lg,
-        borderWidth: 1.5,
         overflow: 'hidden',
     },
     cardContent: {

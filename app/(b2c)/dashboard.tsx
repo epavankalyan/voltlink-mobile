@@ -11,12 +11,52 @@ import { getB2CStats } from '../../services/b2c.service';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { useRouter } from 'expo-router';
+import { useLanguageStore, Language } from '../../store/languageStore';
+
+const translations = {
+    English: {
+        welcome: 'Welcome back,',
+        familyVehicles: 'FAMILY VEHICLES',
+        add: 'Add',
+        credits: 'Credits',
+        co2Saved: 'CO₂ Saved',
+        sessions: 'Sessions',
+        availableCredits: 'Available Credits',
+        viewHistory: 'View transaction history',
+        findStations: 'Find Charging Stations Near You',
+        addFamilyVehicle: 'Add Family Vehicle',
+        familyName: 'Family Member Name',
+        vehicleModel: 'Vehicle Model (e.g. Nexon EV)',
+        batteryLevel: 'Current Battery %',
+        cancel: 'Cancel',
+        addVehicle: 'Add Vehicle'
+    },
+    'हिंदी': {
+        welcome: 'वापसी पर स्वागत है,',
+        familyVehicles: 'पारिवारिक वाहन',
+        add: 'जोड़ें',
+        credits: 'क्रेडिट',
+        co2Saved: 'CO₂ बचत',
+        sessions: 'सत्र',
+        availableCredits: 'उपलब्ध क्रेडिट',
+        viewHistory: 'लेन-देन का इतिहास देखें',
+        findStations: 'अपने पास चार्जिंग स्टेशन खोजें',
+        addFamilyVehicle: 'पारिवारिक वाहन जोड़ें',
+        familyName: 'परिवार के सदस्य का नाम',
+        vehicleModel: 'वाहन मॉडल (जैसे नेक्सॉन ईवी)',
+        batteryLevel: 'वर्तमान बैटरी %',
+        cancel: 'रद्द करें',
+        addVehicle: 'वाहन जोड़ें'
+    }
+};
 
 const B2CDashboard = () => {
     const { theme } = useThemeStore();
+    const { language, setLanguage } = useLanguageStore();
     const { myVehicle, familyVehicles, addFamilyVehicle } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
+    const t = translations[language];
 
     const [refreshing, setRefreshing] = useState(false);
     const [stats, setStats] = useState<any>(null);
@@ -42,7 +82,10 @@ const B2CDashboard = () => {
 
     const handleAddVehicle = () => {
         if (!newVehicle.memberName || !newVehicle.vehicleModel) return;
-        addFamilyVehicle(newVehicle);
+        addFamilyVehicle({
+            ...newVehicle,
+            coordinates: { latitude: 28.495, longitude: 77.088 }
+        });
         setShowAddVehicle(false);
         setNewVehicle({ memberName: '', vehicleModel: '', batteryLevel: 80 });
     };
@@ -61,8 +104,28 @@ const B2CDashboard = () => {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={[styles.greeting, { color: textSecondary }]}>Welcome back,</Text>
-                    <Text style={[styles.name, { color: textPrimary }]}>Abhinash</Text>
+                    <View style={styles.headerTop}>
+                        <View>
+                            <Text style={[styles.greeting, { color: textSecondary }]}>{t.welcome}</Text>
+                            <Text style={[styles.name, { color: textPrimary }]}>Abhinash</Text>
+                        </View>
+                        <View style={styles.langSwitch}>
+                            {(['English', 'हिंदी'] as Language[]).map((l) => (
+                                <TouchableOpacity
+                                    key={l}
+                                    onPress={() => setLanguage(l)}
+                                    style={[
+                                        styles.langPill,
+                                        language === l && { backgroundColor: COLORS.brandBlue }
+                                    ]}
+                                >
+                                    <Text style={[styles.langText, { color: language === l ? '#000' : textSecondary }]}>
+                                        {l}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
                 </View>
 
                 {/* Vehicle Card */}
@@ -73,7 +136,7 @@ const B2CDashboard = () => {
 
                 {/* Family Members Strip */}
                 <View style={styles.sectionHeaderRow}>
-                    <Text style={[styles.familyTitle, { color: textSecondary }]}>FAMILY VEHICLES</Text>
+                    <Text style={[styles.familyTitle, { color: textSecondary }]}>{t.familyVehicles}</Text>
                     <TouchableOpacity onPress={() => setShowAddVehicle(true)}>
                         <Plus size={16} color={COLORS.primaryGreen} />
                     </TouchableOpacity>
@@ -101,7 +164,7 @@ const B2CDashboard = () => {
                     <TouchableOpacity onPress={() => setShowAddVehicle(true)}>
                         <View style={[styles.addVehicleCard, { borderColor: COLORS.primaryGreen + '40' }]}>
                             <Plus size={24} color={COLORS.primaryGreen} />
-                            <Text style={[styles.addVehicleText, { color: COLORS.primaryGreen }]}>Add</Text>
+                            <Text style={[styles.addVehicleText, { color: COLORS.primaryGreen }]}>{t.add}</Text>
                         </View>
                     </TouchableOpacity>
                 </ScrollView>
@@ -109,18 +172,18 @@ const B2CDashboard = () => {
                 {/* Quick Stats */}
                 <View style={styles.statsRow}>
                     <MetricCard
-                        label="Credits"
+                        label={t.credits}
                         value={stats?.availableCredits || 0}
                         icon={<Wallet size={16} color={COLORS.brandBlue} />}
                     />
                     <MetricCard
-                        label="CO₂ Saved"
+                        label={t.co2Saved}
                         value={`${stats?.carbonSavedKg || 0}`}
                         unit="kg"
                         icon={<Leaf size={16} color={COLORS.successGreen} />}
                     />
                     <MetricCard
-                        label="Sessions"
+                        label={t.sessions}
                         value={stats?.totalSessions || 0}
                         icon={<Zap size={16} color={COLORS.brandBlue} />}
                     />
@@ -131,13 +194,13 @@ const B2CDashboard = () => {
                     <GlassCard style={styles.creditCard as any} intensity={40}>
                         <View style={styles.creditHeader}>
                             <View style={styles.creditInfo}>
-                                <Text style={styles.creditLabel}>Available Credits</Text>
+                                <Text style={styles.creditLabel}>{t.availableCredits}</Text>
                                 <Text style={styles.creditValue}>{stats?.availableCredits || 0}</Text>
                             </View>
                             <Wallet color="#FFF" size={32} />
                         </View>
                         <View style={styles.creditFooter}>
-                            <Text style={styles.creditSubtext}>View transaction history</Text>
+                            <Text style={styles.creditSubtext}>{t.viewHistory}</Text>
                             <ChevronRight color="#FFF" size={16} />
                         </View>
                     </GlassCard>
@@ -150,7 +213,7 @@ const B2CDashboard = () => {
                     activeOpacity={0.85}
                 >
                     <Map size={20} color={COLORS.brandBlue} />
-                    <Text style={styles.discoverText}>Find Charging Stations Near You</Text>
+                    <Text style={styles.discoverText}>{t.findStations}</Text>
                     <ChevronRight size={18} color={COLORS.brandBlue} />
                 </TouchableOpacity>
             </ScrollView>
@@ -160,7 +223,7 @@ const B2CDashboard = () => {
                 <View style={styles.modalOverlay}>
                     <GlassCard style={styles.modalContent} intensity={60}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: textPrimary }]}>Add Family Vehicle</Text>
+                            <Text style={[styles.modalTitle, { color: textPrimary }]}>{t.addFamilyVehicle}</Text>
                             <TouchableOpacity onPress={() => setShowAddVehicle(false)}>
                                 <X color={textPrimary} size={24} />
                             </TouchableOpacity>
@@ -168,7 +231,7 @@ const B2CDashboard = () => {
 
                         <TextInput
                             style={[styles.input, { backgroundColor: inputBg, borderColor: borderColor, color: textPrimary }]}
-                            placeholder="Family Member Name"
+                            placeholder={t.familyName}
                             placeholderTextColor={textSecondary}
                             value={newVehicle.memberName}
                             onChangeText={t => setNewVehicle(p => ({ ...p, memberName: t }))}
@@ -176,7 +239,7 @@ const B2CDashboard = () => {
 
                         <TextInput
                             style={[styles.input, { backgroundColor: inputBg, borderColor: borderColor, color: textPrimary }]}
-                            placeholder="Vehicle Model (e.g. Nexon EV)"
+                            placeholder={t.vehicleModel}
                             placeholderTextColor={textSecondary}
                             value={newVehicle.vehicleModel}
                             onChangeText={t => setNewVehicle(p => ({ ...p, vehicleModel: t }))}
@@ -184,7 +247,7 @@ const B2CDashboard = () => {
 
                         <TextInput
                             style={[styles.input, { backgroundColor: inputBg, borderColor: borderColor, color: textPrimary }]}
-                            placeholder="Current Battery %"
+                            placeholder={t.batteryLevel}
                             placeholderTextColor={textSecondary}
                             value={String(newVehicle.batteryLevel)}
                             keyboardType="numeric"
@@ -192,8 +255,8 @@ const B2CDashboard = () => {
                         />
 
                         <View style={styles.modalActions}>
-                            <GlassButton title="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => setShowAddVehicle(false)} />
-                            <GlassButton title="Add Vehicle" style={{ flex: 2 }} onPress={handleAddVehicle} />
+                            <GlassButton title={t.cancel} variant="secondary" style={{ flex: 1 }} onPress={() => setShowAddVehicle(false)} />
+                            <GlassButton title={t.addVehicle} style={{ flex: 2 }} onPress={handleAddVehicle} />
                         </View>
                     </GlassCard>
                 </View>
@@ -206,6 +269,10 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scrollContent: { padding: SPACING.lg, paddingBottom: 120 },
     header: { marginBottom: SPACING.lg, marginTop: Platform.OS === 'android' ? SPACING.md : 0 },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    langSwitch: { flexDirection: 'row', gap: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 4 },
+    langPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
+    langText: { fontSize: 10, fontWeight: '800' },
     greeting: { ...TYPOGRAPHY.label, fontSize: 15 },
     name: { ...TYPOGRAPHY.hero, fontSize: 28 },
     sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm, marginTop: SPACING.md },
