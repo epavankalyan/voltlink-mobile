@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, MapPin, Zap, Clock, ChevronRight, Star, AlertCircle, Car } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapComponent from '../../components/map/MapComponent';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import RatingModal from '../../components/feedback/RatingModal';
@@ -198,55 +198,18 @@ export default function DiscoverScreen() {
                     <>
                         {/* Map View Section */}
                         <View style={[styles.mapContainer, { borderColor }]}>
-                            <MapView
-                                provider={PROVIDER_DEFAULT}
-                                style={styles.map}
-                                initialRegion={{
-                                    latitude: 28.495,
-                                    longitude: 77.088,
-                                    latitudeDelta: 0.05,
-                                    longitudeDelta: 0.05,
-                                }}
-                                customMapStyle={isDark ? darkMapStyle : []}
-                            >
-                                {MOCK_STATIONS.map((station) => {
-                                    const coords = station.coordinates || { latitude: 28.495, longitude: 77.088 };
-                                    return (
-                                        <Marker
-                                            key={`stat-${station.id}`}
-                                            coordinate={{
-                                                latitude: Number(coords.latitude),
-                                                longitude: Number(coords.longitude)
-                                            }}
-                                            title={station.name}
-                                            description={`${station.availableChargers}/${station.totalChargers} ${t.available}`}
-                                        >
-                                            <View style={[styles.markerContainer, { backgroundColor: COLORS.successGreen }]}>
-                                                <Zap size={14} color="#000" />
-                                            </View>
-                                        </Marker>
-                                    );
-                                })}
-
-                                {familyVehicles.map((vehicle, idx) => {
-                                    const coords = vehicle.coordinates || INITIAL_FAMILY[idx]?.coordinates || { latitude: 28.495, longitude: 77.088 };
-                                    return (
-                                        <Marker
-                                            key={`veh-${vehicle.id}`}
-                                            coordinate={{
-                                                latitude: Number(coords.latitude),
-                                                longitude: Number(coords.longitude)
-                                            }}
-                                            title={vehicle.memberName}
-                                            description={`${vehicle.vehicleModel} • ${vehicle.batteryLevel}%`}
-                                        >
-                                            <View style={[styles.markerContainer, { backgroundColor: COLORS.brandBlue }]}>
-                                                <Car size={14} color="#FFF" />
-                                            </View>
-                                        </Marker>
-                                    );
-                                })}
-                            </MapView>
+                            <MapComponent
+                                isDark={isDark}
+                                stations={MOCK_STATIONS}
+                                familyVehicles={familyVehicles}
+                                initialFamily={INITIAL_FAMILY}
+                                t={t}
+                                COLORS={COLORS}
+                                darkMapStyle={darkMapStyle}
+                                markerContainerStyle={styles.markerContainer}
+                                MarkerZapIcon={<Zap size={14} color="#000" />}
+                                MarkerCarIcon={<Car size={14} color="#FFF" />}
+                            />
                         </View>
 
                         <View style={styles.filterRow}>
