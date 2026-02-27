@@ -59,7 +59,7 @@ Ensure you have the following installed on your machine:
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/epavankalyan/voltlink-mobile.git
 cd voltlink-mobile
 ```
 
