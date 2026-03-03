@@ -43,17 +43,11 @@ const INITIAL_MY_VEHICLE: MyVehicle = {
     lastChargedAt: new Date(Date.now() - 7200000).toISOString(),
 };
 
-export const INITIAL_FAMILY: FamilyVehicle[] = [
-    { id: 'fv1', memberName: 'Rohan', vehicleModel: 'Nexon EV', batteryLevel: 72, coordinates: { latitude: 28.502, longitude: 77.092 } },
-    { id: 'fv2', memberName: 'Ananya', vehicleModel: 'MG ZS EV', batteryLevel: 31, coordinates: { latitude: 28.485, longitude: 77.098 } },
-    { id: 'fv3', memberName: 'Mom', vehicleModel: 'Tiago EV', batteryLevel: 88, coordinates: { latitude: 28.498, longitude: 77.075 } },
-];
-
 export const useVehicleStore = create<VehicleState>()(
     persist(
         (set, get) => ({
             myVehicle: INITIAL_MY_VEHICLE,
-            familyVehicles: INITIAL_FAMILY,
+            familyVehicles: [],
             addFamilyVehicle: (v) => set((state) => ({
                 familyVehicles: [...state.familyVehicles, { ...v, id: `fv${Date.now()}` }]
             })),
@@ -63,12 +57,12 @@ export const useVehicleStore = create<VehicleState>()(
             updateMyVehicleBattery: (level) => set((state) => ({
                 myVehicle: { ...state.myVehicle, batteryLevel: level }
             })),
-            // Ensure persisted vehicles have coords
+            // Default coordinates for Bangalore
             getWithCoords: () => {
                 const { familyVehicles } = get() as any;
-                return familyVehicles.map((v: any, i: number) => ({
+                return familyVehicles.map((v: any) => ({
                     ...v,
-                    coordinates: v.coordinates || INITIAL_FAMILY[i]?.coordinates || { latitude: 28.495, longitude: 77.088 }
+                    coordinates: v.coordinates || { latitude: 12.9716, longitude: 77.5946 }
                 }));
             }
         }),

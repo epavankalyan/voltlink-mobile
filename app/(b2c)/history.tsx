@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, Star, Calendar, XCircle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
+import { getUserSessions, getUserBookings } from '../../services/b2c.service';
+import { format } from 'date-fns';
 
 const TABS = ['Active', 'Past'];
 
@@ -22,50 +24,75 @@ type HistoryItem = {
     cost?: number;
     duration?: string;
     rating?: number;
+    status?: string;
 };
-
-const MOCK_ACTIVE_BOOKINGS: HistoryItem[] = [
-    {
-        id: 'b1',
-        time: '3:30 PM Today',
-        station: 'DLF Cyber Hub Charging',
-        cpo: 'VoltLink Premium',
-        type: 'CCS2 DC Fast',
-        estCost: 240,
-    },
-];
-
-const MOCK_PAST_SESSIONS: HistoryItem[] = [
-    {
-        id: 's1',
-        date: '24 Feb 2026',
-        station: 'VoltLink Superhub - Cyber City',
-        kWh: 28.4,
-        cost: 426,
-        duration: '52 min',
-        rating: 5,
-    },
-    {
-        id: 's2',
-        date: '22 Feb 2026',
-        station: 'Tata Power EZ Charge - Sector 44',
-        kWh: 15.2,
-        cost: 334,
-        duration: '31 min',
-        rating: 4,
-    },
-];
 
 export default function HistoryScreen() {
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
     const [activeTab, setActiveTab] = useState('Active');
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [items, setItems] = useState<HistoryItem[]>([]);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            if (activeTab === 'Active') {
+                // Fetch both pending bookings and active sessions
+                const [bookings, sessions] = await Promise.all([
+                    getUserBookings('11', 'pending'),
+                    getUserSessions('11', 'active')
+                ]);
+
+                const mappedItems: HistoryItem[] = [
+                    ...sessions.map((s: any) => ({
+                        id: s.id,
+                        status: 'active',
+                        time: 'Charging Now',
+                        station: s.station_name || 'Charging Station',
+                        type: s.session_type || 'Charging',
+                        cost: s.total_cost,
+                        kWh: s.kwh
+                    })),
+                    ...bookings.map((b: any) => ({
+                        id: b.id,
+                        status: 'pending',
+                        time: format(new Date(b.booking_time), 'hh:mm a') + ' Today',
+                        station: b.connector?.station_name || 'Booked Station',
+                        type: b.connector?.connector_type || 'Reserved'
+                    }))
+                ];
+                setItems(mappedItems);
+            } else {
+                const sessions = await getUserSessions('11', 'completed');
+                const mappedItems: HistoryItem[] = sessions.map((s: any) => ({
+                    id: s.id,
+                    date: format(new Date(s.start_time), 'dd MMM yyyy'),
+                    station: s.station_name || 'Charging Station',
+                    kWh: s.kwh,
+                    cost: s.total_cost,
+                    duration: s.end_time ? `${Math.round((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000)} min` : 'N/A',
+                    rating: 5 // Default for now
+                }));
+                setItems(mappedItems);
+            }
+        } catch (error) {
+            console.error('Error fetching history:', error);
+            Alert.alert('Error', 'Failed to load history data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [activeTab]);
 
     const handleCancelBooking = (id: string) => {
         Alert.alert(
@@ -84,31 +111,38 @@ export default function HistoryScreen() {
 
     const renderItem = ({ item }: { item: HistoryItem }) => {
         if (activeTab === 'Active') {
+            const isActive = item.status === 'active';
             return (
                 <GlassCard style={styles.bookingCard as any} intensity={25}>
                     <View style={styles.cardHeader}>
-                        <View style={[styles.iconBox, { backgroundColor: COLORS.brandBlue + '20' }]}>
-                            <Calendar size={18} color={COLORS.brandBlue} />
+                        <View style={[styles.iconBox, { backgroundColor: isActive ? COLORS.successGreen + '20' : COLORS.brandBlue + '20' }]}>
+                            {isActive ? <Zap size={18} color={COLORS.successGreen} /> : <Calendar size={18} color={COLORS.brandBlue} />}
                         </View>
                         <View style={styles.headerInfo}>
                             <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
                             <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
                         </View>
-                        <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
-                            <XCircle size={22} color={COLORS.alertRed} />
-                        </TouchableOpacity>
+                        {!isActive && (
+                            <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
+                                <XCircle size={22} color={COLORS.alertRed} />
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     <View style={styles.bookingDetails}>
                         <View style={styles.detailRow}>
-                            <Zap size={14} color={COLORS.successGreen} />
-                            <Text style={[styles.detailText, { color: textSecondary }]}>{item.type} · Est. ₹{item.estCost}</Text>
+                            <Zap size={14} color={isActive ? COLORS.successGreen : COLORS.brandBlue} />
+                            <Text style={[styles.detailText, { color: textSecondary }]}>
+                                {item.type} {item.cost ? `· ₹${item.cost}` : ''} {item.kWh ? `· ${item.kWh} kWh` : ''}
+                            </Text>
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.navigateBtn}>
-                        <Text style={styles.navigateText}>View Directions →</Text>
-                    </TouchableOpacity>
+                    {!isActive && (
+                        <TouchableOpacity style={styles.navigateBtn}>
+                            <Text style={styles.navigateText}>View Directions →</Text>
+                        </TouchableOpacity>
+                    )}
                 </GlassCard>
             );
         }
@@ -175,22 +209,29 @@ export default function HistoryScreen() {
                 ))}
             </View>
 
-            <FlatList
-                data={activeTab === 'Active' ? MOCK_ACTIVE_BOOKINGS : MOCK_PAST_SESSIONS}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={[styles.emptyText, { color: textSecondary }]}>No {activeTab.toLowerCase()} items found</Text>
-                    </View>
-                }
-            />
+            {loading ? (
+                <View style={styles.emptyContainer}>
+                    <ActivityIndicator color={COLORS.brandBlue} size="large" />
+                </View>
+            ) : (
+                <FlatList
+                    data={items}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderItem}
+                    onRefresh={fetchData}
+                    refreshing={loading}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={[styles.emptyText, { color: textSecondary }]}>No {activeTab.toLowerCase()} items found</Text>
+                        </View>
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 }
-
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, marginBottom: SPACING.md },

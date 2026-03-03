@@ -6,7 +6,6 @@ interface MapComponentProps {
     isDark: boolean;
     stations: any[];
     familyVehicles: any[];
-    initialFamily: any[];
     t: any;
     COLORS: any;
     darkMapStyle: any;
@@ -19,7 +18,6 @@ export default function MapComponent({
     isDark,
     stations,
     familyVehicles,
-    initialFamily,
     t,
     COLORS,
     darkMapStyle,
@@ -32,15 +30,15 @@ export default function MapComponent({
             provider={PROVIDER_DEFAULT}
             style={styles.map}
             initialRegion={{
-                latitude: 28.495,
-                longitude: 77.088,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
+                latitude: 12.9716,
+                longitude: 77.5946,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
             }}
             customMapStyle={isDark ? darkMapStyle : []}
         >
             {stations.map((station) => {
-                const coords = station.coordinates || { latitude: 28.495, longitude: 77.088 };
+                const coords = station.coordinates || { latitude: 12.9716, longitude: 77.5946 };
                 return (
                     <Marker
                         key={`stat-${station.id}`}
@@ -58,8 +56,8 @@ export default function MapComponent({
                 );
             })}
 
-            {familyVehicles.map((vehicle, idx) => {
-                const coords = vehicle.coordinates || initialFamily[idx]?.coordinates || { latitude: 28.495, longitude: 77.088 };
+            {familyVehicles.map((vehicle) => {
+                const coords = vehicle.coordinates || { latitude: 12.9716, longitude: 77.5946 };
                 return (
                     <Marker
                         key={`veh-${vehicle.id}`}

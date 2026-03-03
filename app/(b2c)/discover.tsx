@@ -11,7 +11,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import RatingModal from '../../components/feedback/RatingModal';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
 import { useThemeStore } from '../../store/themeStore';
-import { useVehicleStore, INITIAL_FAMILY } from '../../store/vehicleStore';
+import { useVehicleStore } from '../../store/vehicleStore';
 import { getStations } from '../../services/stations.service'; // Added
 import { Station } from '../../types/station.types'; // Added
 import { useLanguageStore } from '../../store/languageStore';
@@ -223,7 +223,6 @@ export default function DiscoverScreen() {
                                 isDark={isDark}
                                 stations={stations}
                                 familyVehicles={familyVehicles}
-                                initialFamily={INITIAL_FAMILY}
                                 t={t}
                                 COLORS={COLORS}
                                 darkMapStyle={darkMapStyle}

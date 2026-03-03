@@ -77,10 +77,10 @@ export default function CreditsScreen() {
                     <GlassCard style={styles.modalCard as any} intensity={60}>
                         <Text style={[styles.modalTitle, { color: textPrimary }]}>Transfer Credits</Text>
                         <Text style={[styles.modalSub, { color: textSecondary }]}>Select a family member to transfer credits to:</Text>
-                        {['Rohan (Nexon EV)', 'Ananya (MG ZS EV)', 'Mom (Tiago EV)'].map(m => (
-                            <TouchableOpacity key={m} style={styles.modalOption}
-                                onPress={() => { setTransferModal(false); Alert.alert('Transferred', `50 credits sent to ${m.split(' ')[0]}.`); }}>
-                                <Text style={[styles.modalOptionText, { color: textPrimary }]}>{m}</Text>
+                        {(stats?.family_members || []).map((m: any) => (
+                            <TouchableOpacity key={m.id} style={styles.modalOption}
+                                onPress={() => { setTransferModal(false); Alert.alert('Transferred', `50 credits sent to ${m.name}.`); }}>
+                                <Text style={[styles.modalOptionText, { color: textPrimary }]}>{m.name} ({m.relation})</Text>
                             </TouchableOpacity>
                         ))}
                         <TouchableOpacity onPress={() => setTransferModal(false)} style={styles.modalCancel}>

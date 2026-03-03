@@ -35,3 +35,18 @@ export const getSustainabilityStats = async (userId: string = '11') => {
         carbonRank: res.data.carbon_rank
     }));
 };
+
+/**
+ * Fetches user sessions (active or completed)
+ */
+export const getUserSessions = async (userId: string = '11', status?: string) => {
+    return apiClient.get(`/b2c/users/${userId}/active-session`, {
+        params: { status }
+    }).then(res => res.data);
+};
+
+export const getUserBookings = async (userId: string = '11', status?: string) => {
+    return apiClient.get(`/users/${userId}/bookings`, {
+        params: { status }
+    }).then(res => res.data);
+};

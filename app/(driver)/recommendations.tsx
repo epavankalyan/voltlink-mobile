@@ -55,10 +55,12 @@ export default function RecommendationsScreen() {
         Alert.alert('Reported', `Issue for ${selectedStation?.name} reported to management.`);
     };
 
-    // Mock "Charge Now vs Wait" data
-    const chargeNowCost = 284;
-    const waitCost = 210;
+    // Dynamic "Charge Now vs Wait" data from recommendations
+    const firstStation = stations[0] as any;
+    const chargeNowCost = 284; // Base estimate for immediate charging
+    const waitCost = firstStation ? Math.round(firstStation.effectivePrice * 30) : 210; // Assuming 30kWh charge
     const savings = chargeNowCost - waitCost;
+    const waitTime = firstStation?.nextAvailableMinutes || 60;
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
@@ -98,7 +100,7 @@ export default function RecommendationsScreen() {
 
                         {/* Charge Now vs Wait */}
                         <GlassCard style={styles.comparisonCard as any} intensity={25}>
-                            <Text style={[styles.compLabel, { color: textSecondary }]}>Charge Now vs Wait 1 hr</Text>
+                            <Text style={[styles.compLabel, { color: textSecondary }]}>Charge Now vs Wait {waitTime} min</Text>
                             <View style={styles.compRow}>
                                 <View style={styles.compCol}>
                                     <Text style={[styles.compTitle, { color: textSecondary }]}>Charge Now</Text>
@@ -106,12 +108,12 @@ export default function RecommendationsScreen() {
                                 </View>
                                 <View style={styles.compDivider} />
                                 <View style={styles.compCol}>
-                                    <Text style={[styles.compTitle, { color: textSecondary }]}>Wait 1 hr</Text>
+                                    <Text style={[styles.compTitle, { color: textSecondary }]}>Wait {waitTime} min</Text>
                                     <Text style={[styles.compValue, { color: COLORS.successGreen }]}>₹{waitCost}</Text>
                                 </View>
                             </View>
                             <Text style={[styles.compNote, { color: textSecondary }]}>
-                                ⚡ Waiting saves ₹{savings} but delays your next trip by ~60 min
+                                ⚡ Waiting saves ₹{savings} but delays your next trip by ~{waitTime} min
                             </Text>
                         </GlassCard>
 
