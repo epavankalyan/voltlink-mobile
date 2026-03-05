@@ -56,7 +56,7 @@ export const getStationById = async (id: string): Promise<Station> =>
     });
 
 export const getAIRecommendations = async (
-    vehicleId: string = process.env.EXPO_PUBLIC_DEFAULT_VEHICLE_ID ?? 'VH001'
+    vehicleId: string
 ): Promise<Station[]> =>
     apiClient.get(`/vehicles/${vehicleId}/recommendations`).then(res => {
         const data = res.data || [];

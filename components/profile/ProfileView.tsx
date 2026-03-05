@@ -22,7 +22,7 @@ const RELATIONS = ['Spouse', 'Child', 'Parent', 'Sibling', 'Other'];
 export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) => {
     const { theme, toggleTheme } = useThemeStore();
     const { switchRole, setRole } = useRoleStore();
-    const { familyVehicles, addFamilyVehicle, removeFamilyVehicle } = useVehicleStore();
+    const { familyVehicles, fetchFamilyVehicles, addFamilyMemberApi, removeFamilyMemberApi } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
 
@@ -33,6 +33,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
     React.useEffect(() => {
         if (role === 'b2c') {
             getSustainabilityStats().then(setSustainability).catch(console.error);
+            fetchFamilyVehicles();
         }
     }, [role]);
 
@@ -61,24 +62,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
                 {
                     text: "Remove",
                     style: "destructive",
-                    onPress: () => removeFamilyVehicle(id)
+                    onPress: () => removeFamilyMemberApi(id)
                 }
             ]
         );
     };
 
-    const handleAddMember = () => {
+    const handleAddMember = async () => {
         if (!newMember.name) {
             Alert.alert("Error", "Please fill name");
             return;
         }
-        addFamilyVehicle({
-            memberName: newMember.name,
-            vehicleModel: 'EV', // Default
-            batteryLevel: 80
-        });
-        setShowAddFamily(false);
-        setNewMember({ name: '', relation: 'Spouse', phone: '' });
+        try {
+            await addFamilyMemberApi({
+                name: newMember.name,
+                relation: newMember.relation
+            });
+            setShowAddFamily(false);
+            setNewMember({ name: '', relation: 'Spouse', phone: '' });
+        } catch (error) {
+            Alert.alert("Error", "Failed to add family member");
+        }
     };
 
     return (

@@ -7,17 +7,21 @@ import { useThemeStore } from '../../store/themeStore';
 import { getVehicleDashboard } from '../../services/driver.service';
 import { Vehicle } from '../../types/vehicle.types';
 
+import { useVehicleStore } from '../../store/vehicleStore';
+
 export default function DriverProfile() {
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [loading, setLoading] = useState(true);
+    const { currentVehicleId } = useVehicleStore();
 
     useEffect(() => {
-        getVehicleDashboard('VH001')
+        if (!currentVehicleId) return;
+        getVehicleDashboard(currentVehicleId)
             .then(setVehicle)
             .finally(() => setLoading(false));
-    }, []);
+    }, [currentVehicleId]);
 
     if (loading) {
         return (

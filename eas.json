@@ -8,12 +8,18 @@
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1"
             }
         },
         "preview": {
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1"
             }
         },
         "production": {

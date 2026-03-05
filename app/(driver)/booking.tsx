@@ -1,54 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert,
-    Modal, TextInput, Linking, KeyboardAvoidingView, Platform
+    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, Zap, Clock, CheckCircle, Navigation } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Zap, Clock, CheckCircle } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
+import { getStationSlots, createSession, SlotInfo, ConnectorSlots } from '../../services/session.service';
+import { useVehicleStore } from '../../store/vehicleStore';
+import { getStationById } from '../../services/stations.service';
 
-const TIME_SLOTS = [
-    { id: 's1', time: '2:30 PM', available: true, price: 15 },
-    { id: 's2', time: '3:00 PM', available: true, price: 15 },
-    { id: 's3', time: '3:30 PM', available: false, price: 15 },
-    { id: 's4', time: '4:00 PM', available: true, price: 12 },
-    { id: 's5', time: '4:30 PM', available: true, price: 12 },
-    { id: 's6', time: '5:00 PM', available: true, price: 14 },
-    { id: 's7', time: '5:30 PM', available: false, price: 14 },
-    { id: 's8', time: '6:00 PM', available: true, price: 16 },
-];
-
-const MOCK_STATION = {
-    name: 'VoltLink Superhub — Cyber City',
-    cpo: 'VoltLink Premium',
-    distanceKm: 2.4,
-    etaMin: 8,
-    pricePerKwh: 15,
-    chargerType: 'CCS2 DC Fast',
-    lat: 28.4945,
-    lng: 77.1855,
-};
-
-// First available slot is auto-selected
-const DEFAULT_SLOT = TIME_SLOTS.find(s => s.available)!;
+const DEFAULT_USER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11', 10);
 
 export default function DriverBooking() {
     const { theme } = useThemeStore();
+    const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
-    const params = useLocalSearchParams<{ rank?: string }>();
-    const isOption2 = params.rank === '2';
+    const params = useLocalSearchParams<{ stationId?: string }>();
 
-    // Slot is auto-selected — first available slot
-    const selectedSlot = DEFAULT_SLOT.id;
-
+    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [confirmed, setConfirmed] = useState(false);
-    const [showReasonModal, setShowReasonModal] = useState(false);
-    const [reason, setReason] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [station, setStation] = useState<any>(null);
+    const [connectorSlots, setConnectorSlots] = useState<ConnectorSlots[]>([]);
+    const [allSlots, setAllSlots] = useState<(SlotInfo & { id: string })[]>([]);
+    const [selectedConnectorId, setSelectedConnectorId] = useState<string>('');
 
     const scale = useSharedValue(1);
     const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -56,120 +36,99 @@ export default function DriverBooking() {
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
-    const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
-    const borderClr = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
 
-    const selectedPrice = DEFAULT_SLOT.price;
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const stationId = params.stationId || '1';
+                const [stationData, slotsData] = await Promise.all([
+                    getStationById(stationId),
+                    getStationSlots(stationId),
+                ]);
+                setStation(stationData);
+                setConnectorSlots(slotsData);
+
+                // Flatten slots with unique IDs for the picker
+                const flat = slotsData.flatMap((cs: ConnectorSlots, ci: number) =>
+                    cs.slots.map((s: SlotInfo, si: number) => ({
+                        ...s,
+                        id: `${ci}-${si}`,
+                        _connectorId: cs.connector_id,
+                    }))
+                );
+                setAllSlots(flat as any);
+                if (slotsData.length > 0) {
+                    setSelectedConnectorId(slotsData[0].connector_id);
+                }
+            } catch (error) {
+                console.error('Error fetching booking data:', error);
+                Alert.alert('Error', 'Failed to load station info.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [params.stationId]);
+
+    // Get the first connector's data for display
+    const connector = connectorSlots[0];
+    const displaySlots = connector?.slots.map((s, i) => ({ ...s, id: `0-${i}` })) || [];
+
     const estimatedKwh = 28;
+    const selectedPrice = displaySlots.find(s => s.id === selectedSlot)?.price_per_kwh
+        || station?.pricePerKwh || 15;
     const estimatedCost = estimatedKwh * selectedPrice;
     const creditsEarned = Math.round(estimatedCost * 0.1);
 
-    const openGoogleMaps = () => {
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${MOCK_STATION.lat},${MOCK_STATION.lng}&travelmode=driving`;
-        Linking.canOpenURL(url).then(ok => {
-            if (ok) Linking.openURL(url);
-            else Linking.openURL(`https://maps.google.com/?q=${MOCK_STATION.lat},${MOCK_STATION.lng}`);
-        });
-    };
-
-    const proceedToConfirm = () => {
-        scale.value = withSpring(0.95, {}, () => { scale.value = withSpring(1); });
-        setConfirmed(true);
-    };
-
-    const handleConfirm = () => {
-        if (isOption2) {
-            // Show reason modal first
-            setShowReasonModal(true);
-        } else {
-            proceedToConfirm();
-        }
-    };
-
-    const handleReasonSubmit = () => {
-        if (!reason.trim()) {
-            Alert.alert('Add Reason', 'Please enter a reason for booking this option.');
+    const handleConfirm = async () => {
+        if (!selectedSlot) {
+            Alert.alert('Select a Slot', 'Please pick an available time slot first.');
             return;
         }
-        setShowReasonModal(false);
-        proceedToConfirm();
+        scale.value = withSpring(0.95, {}, () => { scale.value = withSpring(1); });
+
+        try {
+            if (!currentVehicleId) throw new Error('No vehicle selected');
+
+            await createSession({
+                connector_id: selectedConnectorId || connector?.connector_id || '',
+                vehicle_id: currentVehicleId,
+                user_id: DEFAULT_USER_ID,
+                session_type: 'CHARGING',
+            });
+            setConfirmed(true);
+            setTimeout(() => {
+                router.replace('/(driver)/session');
+            }, 1800);
+        } catch (error) {
+            console.error('Error creating session:', error);
+            Alert.alert('Error', 'Failed to start session. Please try again.');
+        }
     };
 
-    // Booking Confirmed screen
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.brandBlue} />
+            </SafeAreaView>
+        );
+    }
+
     if (confirmed) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
-                <ScrollView contentContainerStyle={styles.confirmedContent}>
-                    <CheckCircle size={80} color={COLORS.successGreen} />
-                    <Text style={[styles.confirmedTitle, { color: textPrimary }]}>Booking Confirmed!</Text>
-                    <Text style={[styles.confirmedSub, { color: textSecondary }]}>
-                        {MOCK_STATION.name}
-                    </Text>
-                    <Text style={[styles.confirmedSlot, { color: textSecondary }]}>
-                        Slot: {DEFAULT_SLOT.time} · ₹{selectedPrice}/kWh
-                    </Text>
-
-                    {/* Navigate to station */}
-                    <TouchableOpacity style={styles.mapsBtn} onPress={openGoogleMaps} activeOpacity={0.85}>
-                        <Navigation size={20} color="#000" />
-                        <Text style={styles.mapsBtnText}>Navigate in Google Maps</Text>
-                    </TouchableOpacity>
-
-                    {/* Start Charging */}
-                    <TouchableOpacity
-                        style={styles.startChargingBtn}
-                        onPress={() => router.replace('/(driver)/session')}
-                        activeOpacity={0.85}
-                    >
-                        <Zap size={20} color="#000" />
-                        <Text style={styles.startChargingText}>Start Charging</Text>
-                    </TouchableOpacity>
-                </ScrollView>
+            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+                <CheckCircle size={80} color={COLORS.successGreen} />
+                <Text style={[styles.confirmedTitle, { color: textPrimary }]}>Booking Confirmed!</Text>
+                <Text style={[styles.confirmedSub, { color: textSecondary }]}>
+                    Navigating to session…
+                </Text>
             </SafeAreaView>
         );
     }
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
-            {/* Add Reason Modal for Option 2 */}
-            <Modal visible={showReasonModal} transparent animationType="slide">
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.modalOverlay}
-                >
-                    <GlassCard style={styles.modalCard} intensity={60}>
-                        <Text style={[styles.modalTitle, { color: textPrimary }]}>Add Reason</Text>
-                        <Text style={[styles.modalSub, { color: textSecondary }]}>
-                            Why are you choosing this option?
-                        </Text>
-                        <TextInput
-                            style={[styles.reasonInput, { backgroundColor: inputBg, borderColor: borderClr, color: textPrimary }]}
-                            placeholder="e.g. Closer to my route, cheaper rate…"
-                            placeholderTextColor={textSecondary}
-                            value={reason}
-                            onChangeText={setReason}
-                            multiline
-                            numberOfLines={3}
-                            autoFocus
-                        />
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={[styles.modalBtn, styles.modalBtnCancel, { borderColor: borderClr }]}
-                                onPress={() => setShowReasonModal(false)}
-                            >
-                                <Text style={[styles.modalBtnText, { color: textSecondary }]}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modalBtn, { backgroundColor: COLORS.brandBlue }]}
-                                onPress={handleReasonSubmit}
-                            >
-                                <Text style={[styles.modalBtnText, { color: '#000' }]}>Confirm</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </GlassCard>
-                </KeyboardAvoidingView>
-            </Modal>
-
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <ArrowLeft size={24} color={textPrimary} />
@@ -181,33 +140,66 @@ export default function DriverBooking() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Station Hero */}
                 <GlassCard style={styles.stationCard as any} intensity={30}>
-                    <Text style={[styles.stationName, { color: textPrimary }]}>{MOCK_STATION.name}</Text>
-                    <Text style={[styles.cpoName, { color: COLORS.brandBlue }]}>{MOCK_STATION.cpo}</Text>
+                    <Text style={[styles.stationName, { color: textPrimary }]}>{station?.name || 'Charging Station'}</Text>
+                    <Text style={[styles.cpoName, { color: COLORS.brandBlue }]}>{station?.cpoName || 'VoltLink Partner'}</Text>
                     <View style={styles.stationMeta}>
                         <View style={styles.metaItem}>
                             <MapPin size={14} color={textSecondary} />
-                            <Text style={[styles.metaText, { color: textSecondary }]}>{MOCK_STATION.distanceKm} km away</Text>
+                            <Text style={[styles.metaText, { color: textSecondary }]}>{station?.distanceKm || '?'} km away</Text>
                         </View>
                         <View style={styles.metaItem}>
                             <Clock size={14} color={textSecondary} />
-                            <Text style={[styles.metaText, { color: textSecondary }]}>{MOCK_STATION.etaMin} min ETA</Text>
+                            <Text style={[styles.metaText, { color: textSecondary }]}>{station?.etaMinutes || '?'} min ETA</Text>
                         </View>
                         <View style={styles.metaItem}>
                             <Zap size={14} color={COLORS.successGreen} />
-                            <Text style={[styles.metaText, { color: textSecondary }]}>{MOCK_STATION.chargerType}</Text>
+                            <Text style={[styles.metaText, { color: textSecondary }]}>
+                                {connector?.connector_type || 'CCS2'} {connector?.power_kw ? `${connector.power_kw}kW` : ''}
+                            </Text>
                         </View>
                     </View>
                 </GlassCard>
 
-                {/* Selected Slot (auto-selected — shown as info, not picker) */}
-                <View style={styles.selectedSlotRow}>
-                    <Text style={[styles.sectionLabel, { color: textSecondary }]}>Selected Slot</Text>
-                    <View style={styles.selectedSlotBadge}>
-                        <Clock size={14} color={COLORS.brandBlue} />
-                        <Text style={styles.selectedSlotTime}>{DEFAULT_SLOT.time}</Text>
-                        <Text style={styles.selectedSlotPrice}>· ₹{DEFAULT_SLOT.price}/kWh</Text>
-                    </View>
-                </View>
+                {/* Slot Picker */}
+                <Text style={[styles.sectionLabel, { color: textSecondary }]}>Select Time Slot</Text>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.slotScroll}
+                >
+                    {displaySlots.map((slot) => {
+                        const isSelected = selectedSlot === slot.id;
+                        return (
+                            <TouchableOpacity
+                                key={slot.id}
+                                onPress={() => slot.available && setSelectedSlot(slot.id)}
+                                style={[
+                                    styles.slotCard,
+                                    !slot.available && styles.slotUnavailable,
+                                    isSelected && { backgroundColor: COLORS.brandBlue, borderColor: COLORS.brandBlue },
+                                    !isSelected && slot.available && {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                                        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                                    }
+                                ]}
+                                activeOpacity={slot.available ? 0.7 : 1}
+                            >
+                                <Text style={[
+                                    styles.slotTime,
+                                    { color: isSelected ? '#000' : slot.available ? textPrimary : textSecondary }
+                                ]}>
+                                    {slot.time}
+                                </Text>
+                                <Text style={[
+                                    styles.slotPrice,
+                                    { color: isSelected ? '#000' : slot.available ? COLORS.successGreen : textSecondary }
+                                ]}>
+                                    {slot.available ? `₹${slot.price_per_kwh}/kWh` : 'Booked'}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
 
                 {/* Cost Estimate */}
                 <Text style={[styles.sectionLabel, { color: textSecondary }]}>Cost Estimate</Text>
@@ -226,18 +218,24 @@ export default function DriverBooking() {
                     </View>
                     <View style={styles.estimateRow}>
                         <Text style={[styles.estimateLabel, { color: textSecondary }]}>VoltCredits to earn</Text>
-                        <Text style={styles.creditsEarned}>+{creditsEarned} credits</Text>
+                        <Text style={[styles.creditsEarned]}>+{creditsEarned} credits</Text>
                     </View>
                 </GlassCard>
 
                 {/* Confirm Button */}
                 <Animated.View style={animStyle}>
                     <TouchableOpacity
-                        style={[styles.confirmBtn, { backgroundColor: COLORS.brandBlue }]}
+                        style={[
+                            styles.confirmBtn,
+                            { backgroundColor: selectedSlot ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }
+                        ]}
                         onPress={handleConfirm}
                         activeOpacity={0.85}
                     >
-                        <Text style={[styles.confirmText, { color: '#000' }]}>
+                        <Text style={[
+                            styles.confirmText,
+                            { color: selectedSlot ? '#000' : COLORS.textMutedDark }
+                        ]}>
                             Confirm Booking
                         </Text>
                     </TouchableOpacity>
@@ -268,26 +266,23 @@ const styles = StyleSheet.create({
     stationMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
     metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     metaText: { ...TYPOGRAPHY.label },
-    sectionLabel: { ...TYPOGRAPHY.label, fontWeight: '700', marginBottom: SPACING.sm },
-    selectedSlotRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: SPACING.lg,
-    },
-    selectedSlotBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(0,212,255,0.1)',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
+    sectionLabel: { ...TYPOGRAPHY.label, fontWeight: '700', marginBottom: SPACING.md, marginTop: SPACING.sm },
+    slotScroll: { paddingBottom: SPACING.xl, gap: SPACING.sm },
+    slotCard: {
+        width: 90,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: BORDER_RADIUS.md,
         borderWidth: 1,
-        borderColor: 'rgba(0,212,255,0.3)',
+        alignItems: 'center',
     },
-    selectedSlotTime: { ...TYPOGRAPHY.body, fontWeight: '700', color: COLORS.brandBlue, fontSize: 14 },
-    selectedSlotPrice: { ...TYPOGRAPHY.label, color: COLORS.successGreen },
+    slotUnavailable: {
+        opacity: 0.4,
+        borderColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'transparent',
+    },
+    slotTime: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 14 },
+    slotPrice: { ...TYPOGRAPHY.label, marginTop: 4 },
     estimateCard: {
         padding: SPACING.lg,
         borderRadius: BORDER_RADIUS.lg,
@@ -315,72 +310,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     confirmText: { ...TYPOGRAPHY.body, fontSize: 16, fontWeight: '700' },
-    // Confirmed screen
-    confirmedContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: SPACING.xl,
-        paddingTop: 80,
-    },
     confirmedTitle: { ...TYPOGRAPHY.hero, fontSize: 28, marginTop: SPACING.xl, textAlign: 'center' },
-    confirmedSub: { ...TYPOGRAPHY.body, marginTop: SPACING.sm, textAlign: 'center', fontWeight: '600' },
-    confirmedSlot: { ...TYPOGRAPHY.label, marginTop: 6, textAlign: 'center' },
-    mapsBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: COLORS.brandBlue,
-        borderRadius: BORDER_RADIUS.xl,
-        paddingVertical: 16,
-        paddingHorizontal: 32,
-        marginTop: SPACING.xl * 1.5,
-        width: '100%',
-        justifyContent: 'center',
-    },
-    mapsBtnText: { ...TYPOGRAPHY.body, color: '#000', fontWeight: '700', fontSize: 15 },
-    startChargingBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: COLORS.successGreen,
-        borderRadius: BORDER_RADIUS.xl,
-        paddingVertical: 16,
-        paddingHorizontal: 32,
-        marginTop: SPACING.md,
-        width: '100%',
-        justifyContent: 'center',
-    },
-    startChargingText: { ...TYPOGRAPHY.body, color: '#000', fontWeight: '700', fontSize: 15 },
-    // Reason Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'flex-end',
-        padding: SPACING.lg,
-        paddingBottom: SPACING.xl,
-    },
-    modalCard: {
-        padding: SPACING.xl,
-        borderRadius: BORDER_RADIUS.xl,
-    },
-    modalTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 20, fontWeight: '700', marginBottom: 6 },
-    modalSub: { ...TYPOGRAPHY.body, marginBottom: SPACING.lg },
-    reasonInput: {
-        borderWidth: 1,
-        borderRadius: BORDER_RADIUS.md,
-        padding: SPACING.md,
-        ...TYPOGRAPHY.body,
-        fontSize: 14,
-        minHeight: 90,
-        textAlignVertical: 'top',
-        marginBottom: SPACING.lg,
-    },
-    modalActions: { flexDirection: 'row', gap: SPACING.md },
-    modalBtn: {
-        flex: 1, height: 50, borderRadius: BORDER_RADIUS.xl,
-        justifyContent: 'center', alignItems: 'center',
-    },
-    modalBtnCancel: { borderWidth: 1 },
-    modalBtnText: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 15 },
+    confirmedSub: { ...TYPOGRAPHY.body, marginTop: SPACING.sm, textAlign: 'center' },
 });

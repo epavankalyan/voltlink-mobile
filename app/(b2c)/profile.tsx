@@ -13,7 +13,7 @@ export default function B2CProfile() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getB2CStats('11')
+        getB2CStats()
             .then(setStats)
             .finally(() => setLoading(false));
     }, []);

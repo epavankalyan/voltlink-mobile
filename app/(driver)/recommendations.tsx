@@ -8,7 +8,8 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
 import { getAIRecommendations } from '../../services/stations.service'; // Added
 import { Station } from '../../types/station.types'; // Added
-import { useRouter } from 'expo-router';
+import { useVehicleStore } from '../../store/vehicleStore';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import RatingModal from '../../components/feedback/RatingModal';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
 import { Alert } from 'react-native';
@@ -26,17 +27,21 @@ export default function RecommendationsScreen() {
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const { currentVehicleId } = useVehicleStore();
+
     useEffect(() => {
+        if (!currentVehicleId) return;
         setLoading(true);
-        getAIRecommendations('VH001')
+        getAIRecommendations(currentVehicleId)
             .then(setStations)
             .catch(err => console.error('Error fetching recommendations:', err))
             .finally(() => setLoading(false));
-    }, []);
+    }, [currentVehicleId]);
 
     const onRefresh = () => {
+        if (!currentVehicleId) return;
         setLoading(true);
-        getAIRecommendations('VH001')
+        getAIRecommendations(currentVehicleId)
             .then(setStations)
             .finally(() => setLoading(false));
     };
@@ -57,8 +62,8 @@ export default function RecommendationsScreen() {
 
     // Dynamic "Charge Now vs Wait" data from recommendations
     const firstStation = stations[0] as any;
-    const chargeNowCost = 284; // Base estimate for immediate charging
-    const waitCost = firstStation ? Math.round(firstStation.effectivePrice * 30) : 210; // Assuming 30kWh charge
+    const chargeNowCost = firstStation ? Math.round((firstStation.pricePerKwh || 9.5) * 30) : 284;
+    const waitCost = firstStation ? Math.round(firstStation.effectivePrice * 30) : 210; // 30kWh charge
     const savings = chargeNowCost - waitCost;
     const waitTime = firstStation?.nextAvailableMinutes || 60;
 
@@ -69,8 +74,9 @@ export default function RecommendationsScreen() {
                 keyExtractor={(item) => item.id}
                 refreshing={loading}
                 onRefresh={() => {
+                    if (!currentVehicleId) return;
                     setLoading(true);
-                    getAIRecommendations()
+                    getAIRecommendations(currentVehicleId)
                         .then(setStations)
                         .finally(() => setLoading(false));
                 }}

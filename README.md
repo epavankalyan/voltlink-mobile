@@ -91,7 +91,6 @@ All variables are prefixed with `EXPO_PUBLIC_` and defined in `.env` (copy from 
 |---|---|---|---|
 | `EXPO_PUBLIC_API_URL` | ✅ Yes | — | Full backend API base URL (e.g. `https://api.voltlink.io/api/v1`) |
 | `EXPO_PUBLIC_API_TIMEOUT` | No | `10000` | Request timeout in milliseconds |
-| `EXPO_PUBLIC_DEFAULT_VEHICLE_ID` | No | `VH001` | Fallback vehicle ID before auth resolves |
 | `EXPO_PUBLIC_DEFAULT_FLEET_ID` | No | `1` | Fallback fleet ID for fleet-level calls |
 | `EXPO_PUBLIC_DEFAULT_USER_ID` | No | `11` | Fallback B2C user ID before auth resolves |
 | `EXPO_PUBLIC_DEFAULT_LAT` | No | `12.9716` | Default map latitude (Bangalore) |

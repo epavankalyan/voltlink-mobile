@@ -12,7 +12,9 @@ import { getVehicleDashboard, getTodayStats } from '../../services/driver.servic
 import { getAIRecommendations } from '../../services/stations.service'; // Added
 import { useThemeStore } from '../../store/themeStore';
 import { Vehicle } from '../../types/vehicle.types';
-import { Station } from '../../types/station.types'; // Added
+import { useVehicleStore } from '../../store/vehicleStore';
+import { Station } from '../../types/station.types';
+import { getB2CStats } from '../../services/b2c.service'; // For discovery // Added
 import { useRouter } from 'expo-router';
 import { useLanguageStore, Language } from '../../store/languageStore';
 
@@ -53,12 +55,25 @@ const DriverDashboard = () => {
     const [stats, setStats] = useState<any>(null);
     const [recommendations, setRecommendations] = useState<Station[]>([]); // Added
 
+    const { currentVehicleId, setCurrentVehicleId } = useVehicleStore();
+
     const fetchData = async () => {
         try {
+            let vehicleId = currentVehicleId;
+
+            // Simple discovery if vehicleId is missing
+            if (!vehicleId) {
+                const profile = await getB2CStats();
+                vehicleId = profile?.user?.primary_vehicle_id || profile?.vehicles?.[0]?.id;
+                if (vehicleId) setCurrentVehicleId(vehicleId);
+            }
+
+            if (!vehicleId) return;
+
             const [vData, sData, rData] = await Promise.all([
-                getVehicleDashboard('VH001'),
-                getTodayStats('VH001'),
-                getAIRecommendations('VH001')
+                getVehicleDashboard(vehicleId),
+                getTodayStats(vehicleId),
+                getAIRecommendations(vehicleId)
             ]);
             setVehicle(vData);
             setStats(sData);
