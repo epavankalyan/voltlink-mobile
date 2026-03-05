@@ -10,7 +10,10 @@
                 "buildType": "apk"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1"
+                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1",
+                "EXPO_PUBLIC_API_TIMEOUT": "10000",
+                "EXPO_PUBLIC_DEFAULT_FLEET_ID": "FLEET001",
+                "EXPO_PUBLIC_DEFAULT_USER_ID": "11"
             }
         },
         "preview": {
@@ -19,7 +22,10 @@
                 "buildType": "apk"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1"
+                "EXPO_PUBLIC_API_URL": "https://voltlink-be.coffeebeans.io/api/v1",
+                "EXPO_PUBLIC_API_TIMEOUT": "10000",
+                "EXPO_PUBLIC_DEFAULT_FLEET_ID": "FLEET001",
+                "EXPO_PUBLIC_DEFAULT_USER_ID": "11"
             }
         },
         "production": {

@@ -1,6 +1,16 @@
 import { apiClient } from './api.service';
 
 const DEFAULT_FLEET_ID = process.env.EXPO_PUBLIC_DEFAULT_FLEET_ID ?? '1';
+const DEFAULT_DRIVER_ID = process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4';
+
+export const getDriverProfile = async (driverId: string = DEFAULT_DRIVER_ID) =>
+    apiClient.get(`/users/${driverId}`).then(res => res.data?.data || res.data);
+
+export const getVehiclesByDriver = async (driverId: string = DEFAULT_DRIVER_ID) =>
+    apiClient.get(`/users/${driverId}`).then(res => {
+        const data = res.data?.data || res.data;
+        return data?.vehicles || [];
+    });
 
 export const getVehicleDashboard = async (vehicleId: string) =>
     apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
