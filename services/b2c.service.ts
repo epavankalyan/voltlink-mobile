@@ -37,7 +37,7 @@ export const getSustainabilityStats = async (userId: string = DEFAULT_USER_ID) =
 
 export const getUserSessions = async (userId: string = DEFAULT_USER_ID, status?: string) =>
     apiClient
-        .get(`/b2c/users/${userId}/active-session`, { params: { status } })
+        .get(`/b2c/users/${userId}/session`, { params: { status } })
         .then(res => res.data);
 
 export const getUserBookings = async (userId: string = DEFAULT_USER_ID, status?: string) =>

@@ -84,8 +84,12 @@ export const VehicleCard: React.FC<{ vehicle: Vehicle; onPress?: () => void }> =
             <GlassCard style={styles.card as any} intensity={30}>
                 <BatteryIndicator percentage={vehicle.batteryLevel} size={100} />
                 <View style={styles.cardInfo}>
-                    <Text style={[styles.vehicleName, { color: textPrimary }]}>{vehicle.name}</Text>
-                    <Text style={[styles.vehicleDetail, { color: textSecondary }]}>{vehicle.model} • {vehicle.licensePlate}</Text>
+                    <Text style={[styles.vehicleName, { color: textPrimary }]}>
+                        {[vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}
+                    </Text>
+                    <Text style={[styles.vehicleDetail, { color: textSecondary }]}>
+                        {vehicle.licensePlate || 'License Plate N/A'}
+                    </Text>
                     <Text style={[styles.vehicleDetail, { color: COLORS.brandBlue }]}>
                         Range: {vehicle.rangeKm} km remaining
                     </Text>

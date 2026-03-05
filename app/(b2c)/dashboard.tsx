@@ -53,7 +53,7 @@ const translations = {
 const B2CDashboard = () => {
     const { theme } = useThemeStore();
     const { language, setLanguage } = useLanguageStore();
-    const { myVehicle, familyVehicles, addFamilyVehicle } = useVehicleStore();
+    const { myVehicle, familyVehicles, addFamilyVehicle, fetchMyVehicle, setCurrentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
     const t = translations[language];
@@ -67,6 +67,13 @@ const B2CDashboard = () => {
         try {
             const sData = await getB2CStats();
             setStats(sData);
+
+            // Set current vehicle ID from profile if available
+            const vehicleId = sData?.user?.primary_vehicle_id || sData?.vehicles?.[0]?.id;
+            if (vehicleId) {
+                setCurrentVehicleId(vehicleId);
+                await fetchMyVehicle(vehicleId);
+            }
         } catch (error) {
             console.error('Error fetching B2C dashboard data:', error);
         }

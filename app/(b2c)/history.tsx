@@ -46,8 +46,8 @@ export default function HistoryScreen() {
             if (activeTab === 'Active') {
                 // Fetch both pending bookings and active sessions
                 const [bookings, sessions] = await Promise.all([
-                    getUserBookings('11', 'pending'),
-                    getUserSessions('11', 'active')
+                    getUserBookings(undefined, 'pending'),
+                    getUserSessions(undefined, 'active')
                 ]);
 
                 const mappedItems: HistoryItem[] = [
@@ -70,7 +70,7 @@ export default function HistoryScreen() {
                 ];
                 setItems(mappedItems);
             } else {
-                const sessions = await getUserSessions('11', 'completed');
+                const sessions = await getUserSessions(undefined, 'completed');
                 const mappedItems: HistoryItem[] = sessions.map((s: any) => ({
                     id: s.id,
                     date: format(new Date(s.start_time), 'dd MMM yyyy'),

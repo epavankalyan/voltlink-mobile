@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert
+    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -12,6 +12,8 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
+import { getVehicleActiveSession, stopSession } from '../../services/session.service';
+import { useVehicleStore } from '../../store/vehicleStore';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -19,19 +21,22 @@ const STROKE = 16;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
+const POLL_INTERVAL = 5000; // 5 seconds
+
 export default function SessionScreen() {
     const { theme } = useThemeStore();
+    const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
 
-    const [chargePercent, setChargePercent] = useState(18);
-    const [kwhDelivered, setKwhDelivered] = useState(0);
-    const [elapsed, setElapsed] = useState(0); // seconds
+    const [session, setSession] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [sessionEnded, setSessionEnded] = useState(false);
     const [rating, setRating] = useState(0);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
-    const progress = useSharedValue(0.18);
+    const progress = useSharedValue(0);
     const pulseOpacity = useSharedValue(1);
 
     // Pulse the ring
@@ -43,20 +48,31 @@ export default function SessionScreen() {
         );
     }, []);
 
-    // Simulate charging progression
+    // Poll active session
+    const fetchSession = useCallback(async () => {
+        if (!currentVehicleId) return;
+        try {
+            const data = await getVehicleActiveSession(currentVehicleId);
+            setSession(data);
+            const soc = data.current_soc ?? 0;
+            progress.value = withTiming(soc / 100, { duration: 1000 });
+            setLoading(false);
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                // No active session — may have ended
+                if (session) setSessionEnded(true);
+            } else {
+                console.error('Error polling session:', error);
+            }
+            setLoading(false);
+        }
+    }, [session]);
+
     useEffect(() => {
-        if (sessionEnded) return;
-        const timer = setInterval(() => {
-            setChargePercent(p => {
-                const next = Math.min(p + 1, 100);
-                progress.value = withTiming(next / 100, { duration: 2800 });
-                return next;
-            });
-            setKwhDelivered(k => parseFloat((k + 0.47).toFixed(2)));
-            setElapsed(e => e + 3);
-        }, 3000);
+        fetchSession();
+        const timer = setInterval(fetchSession, POLL_INTERVAL);
         return () => clearInterval(timer);
-    }, [sessionEnded]);
+    }, []);
 
     const animProps = useAnimatedProps(() => ({
         strokeDashoffset: CIRCUMFERENCE * (1 - progress.value),
@@ -69,21 +85,41 @@ export default function SessionScreen() {
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
 
+    const chargePercent = session?.current_soc ?? 0;
+    const kwhDelivered = session?.kwh ?? 0;
+    const estimatedCost = session?.total_cost?.toFixed(0) ?? '0';
+    const stationName = session?.station_name || 'Charging Station';
+    const connectorType = session?.connector?.connector_type || 'CCS2 DC Fast';
+    const connectorId = session?.connector_id || '';
+    const chargingRate = session?.charging_rate_kw ?? 0;
+
+    // Calculate elapsed from start_time
+    const elapsed = session?.start_time
+        ? Math.round((Date.now() - new Date(session.start_time).getTime()) / 1000)
+        : 0;
+
     const formatTime = (secs: number) => {
         const m = Math.floor(secs / 60);
         const s = secs % 60;
         return `${m}m ${s < 10 ? '0' : ''}${s}s`;
     };
 
-    const estimatedCost = (kwhDelivered * 15).toFixed(0);
-    const timeRemainingMin = Math.max(0, Math.round(((100 - chargePercent) * 2.8)));
+    const timeRemainingMin = chargingRate > 0
+        ? Math.max(0, Math.round(((100 - chargePercent) / 100 * (session?.vehicle?.battery_capacity_kwh || 40)) / chargingRate * 60))
+        : Math.max(0, Math.round((100 - chargePercent) * 2.8));
 
     const handleStop = () => {
         Alert.alert('Stop Charging?', 'Are you sure you want to end this charging session?', [
             { text: 'Cancel', style: 'cancel' },
             {
-                text: 'Stop Session', style: 'destructive', onPress: () => {
-                    setSessionEnded(true);
+                text: 'Stop Session', style: 'destructive', onPress: async () => {
+                    try {
+                        if (session?.id) await stopSession(session.id);
+                        setSessionEnded(true);
+                    } catch (error) {
+                        console.error('Error stopping session:', error);
+                        Alert.alert('Error', 'Failed to stop session.');
+                    }
                 }
             }
         ]);
@@ -93,6 +129,17 @@ export default function SessionScreen() {
         setRatingSubmitted(true);
         setTimeout(() => router.replace('/(driver)/dashboard'), 1500);
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.brandBlue} />
+                <Text style={[styles.chargeLabel, { color: textSecondary, marginTop: SPACING.md }]}>
+                    Loading session…
+                </Text>
+            </SafeAreaView>
+        );
+    }
 
     if (sessionEnded && !ratingSubmitted) {
         return (
@@ -146,18 +193,19 @@ export default function SessionScreen() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Station Info */}
                 <View style={styles.sessionHeader}>
-                    <Text style={[styles.stationName, { color: textPrimary }]}>VoltLink Superhub — Cyber City</Text>
+                    <Text style={[styles.stationName, { color: textPrimary }]}>{stationName}</Text>
                     <View style={[styles.livePill, { backgroundColor: 'rgba(0,255,136,0.15)' }]}>
                         <View style={styles.liveDot} />
                         <Text style={styles.liveText}>LIVE</Text>
                     </View>
                 </View>
-                <Text style={[styles.chargerId, { color: textSecondary }]}>Charger ID: VL-CC-04 · CCS2 DC Fast</Text>
+                <Text style={[styles.chargerId, { color: textSecondary }]}>
+                    Charger: {connectorId ? connectorId.slice(0, 8) : 'N/A'} · {connectorType}
+                </Text>
 
                 {/* Progress Arc */}
                 <View style={styles.arcContainer}>
                     <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-                        {/* BG Circle */}
                         <Circle
                             cx={SIZE / 2}
                             cy={SIZE / 2}

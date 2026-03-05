@@ -50,7 +50,7 @@ const FILTERS = ['All', 'AC', 'DC', 'Available Now'];
 export default function DiscoverScreen() {
     const { theme } = useThemeStore();
     const { language } = useLanguageStore();
-    const { familyVehicles } = useVehicleStore();
+    const { familyVehicles, fetchFamilyVehicles } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
     const t = translations[language];
@@ -66,8 +66,10 @@ export default function DiscoverScreen() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const data = await getStations();
-            setStations(data);
+            await Promise.all([
+                getStations().then(setStations),
+                fetchFamilyVehicles()
+            ]);
         } catch (error) {
             console.error('Error fetching stations:', error);
         } finally {

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, MapPin, Star } from 'lucide-react-native';
@@ -8,275 +8,243 @@ import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { useThemeStore } from '../../store/themeStore';
+import { getDriverSessions } from '../../services/driver.service';
 
-const FILTERS = ['All', 'This Week', 'This Month'];
+type SessionItem = {
+    id: string;
+    stationName: string;
+    date: string;
+    duration: string;
+    kwh: number;
+    cost: number;
+    rating: number;
+    carbonSaved: number;
+    connectorType: string;
+};
 
-const MOCK_HISTORY = [
-    {
-        id: 'h1',
-        date: '23 Feb 2026',
-        station: 'VoltLink Superhub - Cyber City',
-        cpo: 'VoltLink Premium',
-        kWh: 28.4,
-        cost: 426,
-        durationMin: 52,
-        creditsEarned: 42,
-        rating: 5,
-    },
-    {
-        id: 'h2',
-        date: '22 Feb 2026',
-        station: 'Tata Power EZ Charge - Sector 44',
-        cpo: 'Tata Power',
-        kWh: 15.2,
-        cost: 334,
-        durationMin: 31,
-        creditsEarned: 33,
-        rating: 4,
-    },
-    {
-        id: 'h3',
-        date: '20 Feb 2026',
-        station: 'BESCOM Fast Charger - Indiranagar',
-        cpo: 'BESCOM',
-        kWh: 32.1,
-        cost: 514,
-        durationMin: 65,
-        creditsEarned: 51,
-        rating: 3,
-    },
-    {
-        id: 'h4',
-        date: '18 Feb 2026',
-        station: 'Fortum Charge & Drive - Galleria',
-        cpo: 'Fortum',
-        kWh: 20.8,
-        cost: 416,
-        durationMin: 44,
-        creditsEarned: 41,
-        rating: 5,
-    },
-    {
-        id: 'h5',
-        date: '15 Feb 2026',
-        station: 'Ather Grid - Koramangala',
-        cpo: 'Ather Energy',
-        kWh: 18.6,
-        cost: 298,
-        durationMin: 38,
-        creditsEarned: 29,
-        rating: 4,
-    },
-    {
-        id: 'h6',
-        date: '12 Feb 2026',
-        station: 'ChargePoint - HSR Layout',
-        cpo: 'ChargePoint',
-        kWh: 24.3,
-        cost: 388,
-        durationMin: 48,
-        creditsEarned: 38,
-        rating: 4,
-    },
+type FilterKey = 'all' | 'completed' | 'active';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'active', label: 'Active' },
 ];
 
-export default function HistoryScreen() {
+export default function DriverHistory() {
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
-    const [activeFilter, setActiveFilter] = useState('All');
-    const [expanded, setExpanded] = useState<string | null>(null);
+    const [filter, setFilter] = useState<FilterKey>('all');
+    const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
 
-    const totalCost = MOCK_HISTORY.reduce((a, s) => a + s.cost, 0);
-    const totalKwh = MOCK_HISTORY.reduce((a, s) => a + s.kWh, 0).toFixed(1);
-    const totalCredits = MOCK_HISTORY.reduce((a, s) => a + s.creditsEarned, 0);
+    const fetchSessions = async () => {
+        setLoading(true);
+        try {
+            const status = filter === 'all' ? undefined : filter;
+            const data = await getDriverSessions(undefined, undefined, status);
+            const mapped: SessionItem[] = (data || []).map((s: any) => {
+                const startTime = s.start_time ? new Date(s.start_time) : new Date();
+                const endTime = s.end_time ? new Date(s.end_time) : null;
+                const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+                const mins = Math.round(durationMs / 60000);
+                const hrs = Math.floor(mins / 60);
+                const duration = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
 
-    const renderItem = ({ item }: { item: typeof MOCK_HISTORY[0] }) => {
-        const isExpanded = expanded === item.id;
-        return (
-            <GlassCard style={styles.sessionCard as any} intensity={20}>
-                <Pressable onPress={() => setExpanded(isExpanded ? null : item.id)}>
-                    <View style={styles.sessionRow}>
-                        <View style={[styles.iconBubble, { backgroundColor: 'rgba(0,212,255,0.1)' }]}>
-                            <Zap size={18} color={COLORS.brandBlue} />
-                        </View>
-                        <View style={styles.sessionInfo}>
-                            <Text style={[styles.stationName, { color: textPrimary }]} numberOfLines={1}>
-                                {item.station}
-                            </Text>
-                            <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
-                        </View>
-                        <View style={styles.sessionRight}>
-                            <Text style={[styles.sessionCost, { color: textPrimary }]}>₹{item.cost}</Text>
-                            <Text style={[styles.sessionKwh, { color: COLORS.brandBlue }]}>{item.kWh} kWh</Text>
-                        </View>
-                    </View>
-
-                    {isExpanded && (
-                        <View style={styles.expandedDetail}>
-                            <View style={styles.detailGrid}>
-                                <View style={styles.detailItem}>
-                                    <Clock size={14} color={textSecondary} />
-                                    <Text style={[styles.detailLabel, { color: textSecondary }]}>Duration</Text>
-                                    <Text style={[styles.detailValue, { color: textPrimary }]}>{item.durationMin} min</Text>
-                                </View>
-                                <View style={styles.detailItem}>
-                                    <MapPin size={14} color={textSecondary} />
-                                    <Text style={[styles.detailLabel, { color: textSecondary }]}>CPO</Text>
-                                    <Text style={[styles.detailValue, { color: textPrimary }]}>{item.cpo}</Text>
-                                </View>
-                                <View style={styles.detailItem}>
-                                    <Zap size={14} color={COLORS.successGreen} />
-                                    <Text style={[styles.detailLabel, { color: textSecondary }]}>Credits</Text>
-                                    <Text style={[styles.detailValue, { color: COLORS.successGreen }]}>+{item.creditsEarned}</Text>
-                                </View>
-                                <View style={styles.detailItem}>
-                                    <Star size={14} color={COLORS.warningOrange} />
-                                    <Text style={[styles.detailLabel, { color: textSecondary }]}>Your Rating</Text>
-                                    <Text style={[styles.detailValue, { color: textPrimary }]}>{'★'.repeat(item.rating)}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    )}
-                </Pressable>
-            </GlassCard>
-        );
+                return {
+                    id: s.id,
+                    stationName: s.station_name || 'Charging Station',
+                    date: startTime.toLocaleDateString('en-IN', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                    }),
+                    duration,
+                    kwh: s.kwh || 0,
+                    cost: s.total_cost || 0,
+                    rating: 0,
+                    carbonSaved: s.carbon_saved_kg || 0,
+                    connectorType: s.connector?.connector_type || 'CCS2',
+                };
+            });
+            setSessions(mapped);
+        } catch (error) {
+            console.error('Error loading history:', error);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    useEffect(() => {
+        fetchSessions();
+    }, [filter]);
+
+    const totalKwh = sessions.reduce((s, i) => s + i.kwh, 0);
+    const totalCost = sessions.reduce((s, i) => s + i.cost, 0);
+    const totalCarbon = sessions.reduce((s, i) => s + i.carbonSaved, 0);
+
+    const renderSession = ({ item }: { item: SessionItem }) => (
+        <GlassCard style={styles.sessionCard as any} intensity={20}>
+            <View style={styles.sessionHeader}>
+                <View style={styles.sessionInfo}>
+                    <Text style={[styles.sessionStation, { color: textPrimary }]}>{item.stationName}</Text>
+                    <View style={styles.sessionMeta}>
+                        <MapPin size={12} color={textSecondary} />
+                        <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.connectorType}</Text>
+                        <Clock size={12} color={textSecondary} />
+                        <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
+                    </View>
+                </View>
+                <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
+            </View>
+
+            <View style={styles.sessionStats}>
+                <View style={styles.sessionStat}>
+                    <Zap size={14} color={COLORS.brandBlue} />
+                    <Text style={[styles.sessionStatValue, { color: textPrimary }]}>{item.kwh} kWh</Text>
+                </View>
+                <View style={styles.sessionStat}>
+                    <Text style={[styles.sessionStatValue, { color: COLORS.successGreen }]}>₹{item.cost.toFixed(0)}</Text>
+                </View>
+                {item.carbonSaved > 0 && (
+                    <View style={styles.sessionStat}>
+                        <Text style={[styles.sessionStatValue, { color: textSecondary }]}>🌱 {item.carbonSaved.toFixed(1)} kg</Text>
+                    </View>
+                )}
+            </View>
+
+            {item.rating > 0 && (
+                <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                        <Star
+                            key={n}
+                            size={14}
+                            color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
+                            fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
+                        />
+                    ))}
+                </View>
+            )}
+        </GlassCard>
+    );
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: textPrimary }]}>Charging History</Text>
-            </View>
+            <SectionHeader title="Charging History" />
 
-            {/* Summary Cards */}
-            <View style={styles.summaryRow}>
-                <GlassCard style={styles.summaryCard as any} intensity={20}>
-                    <Text style={[styles.summaryValue, { color: textPrimary }]}>₹{totalCost}</Text>
-                    <Text style={[styles.summaryLabel, { color: textSecondary }]}>Total Spent</Text>
-                </GlassCard>
-                <GlassCard style={styles.summaryCard as any} intensity={20}>
-                    <Text style={[styles.summaryValue, { color: COLORS.brandBlue }]}>{totalKwh}</Text>
-                    <Text style={[styles.summaryLabel, { color: textSecondary }]}>kWh Used</Text>
-                </GlassCard>
-                <GlassCard style={styles.summaryCard as any} intensity={20}>
-                    <Text style={[styles.summaryValue, { color: COLORS.successGreen }]}>{totalCredits}</Text>
-                    <Text style={[styles.summaryLabel, { color: textSecondary }]}>Credits Earned</Text>
-                </GlassCard>
-            </View>
+            {/* Summary Card */}
+            <GlassCard style={styles.summaryCard as any} intensity={25}>
+                <View style={styles.summaryRow}>
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: textPrimary }]}>{sessions.length}</Text>
+                        <Text style={[styles.summaryLabel, { color: textSecondary }]}>Sessions</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: textPrimary }]}>{totalKwh.toFixed(1)}</Text>
+                        <Text style={[styles.summaryLabel, { color: textSecondary }]}>Total kWh</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: COLORS.successGreen }]}>₹{totalCost.toFixed(0)}</Text>
+                        <Text style={[styles.summaryLabel, { color: textSecondary }]}>Total Spent</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryValue, { color: textPrimary }]}>🌱 {totalCarbon.toFixed(1)}</Text>
+                        <Text style={[styles.summaryLabel, { color: textSecondary }]}>kg CO₂</Text>
+                    </View>
+                </View>
+            </GlassCard>
 
-            {/* Filter Pills */}
+            {/* Filters */}
             <View style={styles.filterRow}>
-                {FILTERS.map((f) => (
-                    <TouchableOpacity
-                        key={f}
+                {FILTERS.map(f => (
+                    <Pressable
+                        key={f.key}
                         style={[
-                            styles.filterPill,
-                            activeFilter === f && { backgroundColor: COLORS.brandBlue }
+                            styles.filterChip,
+                            filter === f.key && { backgroundColor: COLORS.brandBlue },
+                            filter !== f.key && { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' },
                         ]}
-                        onPress={() => setActiveFilter(f)}
+                        onPress={() => setFilter(f.key)}
                     >
                         <Text style={[
                             styles.filterText,
-                            { color: activeFilter === f ? '#000' : textSecondary }
-                        ]}>{f}</Text>
-                    </TouchableOpacity>
+                            { color: filter === f.key ? '#000' : textSecondary }
+                        ]}>{f.label}</Text>
+                    </Pressable>
                 ))}
             </View>
 
-            <FlatList
-                data={MOCK_HISTORY}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator={false}
-            />
+            {/* Session List */}
+            {loading ? (
+                <View style={styles.centerLoader}>
+                    <ActivityIndicator size="large" color={COLORS.brandBlue} />
+                </View>
+            ) : (
+                <FlatList
+                    data={sessions}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderSession}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <Text style={[styles.emptyText, { color: textSecondary }]}>No sessions found</Text>
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.md,
-        paddingBottom: SPACING.sm,
-    },
-    title: { ...TYPOGRAPHY.hero, fontSize: 28 },
-    summaryRow: {
-        flexDirection: 'row',
-        paddingHorizontal: SPACING.lg,
-        gap: SPACING.sm,
-        marginBottom: SPACING.md,
-    },
     summaryCard: {
-        flex: 1,
+        marginHorizontal: SPACING.lg,
+        marginBottom: SPACING.md,
         padding: SPACING.md,
-        alignItems: 'center',
-        borderRadius: BORDER_RADIUS.md,
+        borderRadius: BORDER_RADIUS.lg,
     },
-    summaryValue: {
-        ...TYPOGRAPHY.sectionHeader,
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    summaryLabel: { ...TYPOGRAPHY.label, marginTop: 2, textAlign: 'center' },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-around' },
+    summaryItem: { alignItems: 'center' },
+    summaryValue: { ...TYPOGRAPHY.sectionHeader, fontSize: 16, fontWeight: '700' },
+    summaryLabel: { ...TYPOGRAPHY.label, marginTop: 2 },
     filterRow: {
         flexDirection: 'row',
-        paddingHorizontal: SPACING.lg,
-        gap: SPACING.sm,
+        marginHorizontal: SPACING.lg,
         marginBottom: SPACING.md,
+        gap: SPACING.sm,
     },
-    filterPill: {
+    filterChip: {
         paddingHorizontal: SPACING.md,
-        paddingVertical: 6,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(128,128,128,0.3)',
-    },
-    filterText: { ...TYPOGRAPHY.label, fontSize: 13, fontWeight: '600' },
-    list: { paddingHorizontal: SPACING.lg, paddingBottom: 120 },
-    sessionCard: {
-        marginBottom: SPACING.sm,
+        paddingVertical: SPACING.xs,
         borderRadius: BORDER_RADIUS.md,
-        overflow: 'hidden',
     },
-    sessionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    filterText: { ...TYPOGRAPHY.label, fontWeight: '600' },
+    listContent: { paddingHorizontal: SPACING.lg, paddingBottom: 120 },
+    sessionCard: {
         padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.lg,
+        marginBottom: SPACING.sm,
     },
-    iconBubble: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: SPACING.md,
+    sessionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: SPACING.sm,
     },
     sessionInfo: { flex: 1, marginRight: SPACING.sm },
-    stationName: { ...TYPOGRAPHY.body, fontWeight: '600', fontSize: 14 },
-    sessionDate: { ...TYPOGRAPHY.label, marginTop: 2 },
-    sessionRight: { alignItems: 'flex-end' },
-    sessionCost: { ...TYPOGRAPHY.body, fontWeight: '700' },
-    sessionKwh: { ...TYPOGRAPHY.label, marginTop: 2 },
-    expandedDetail: {
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: SPACING.md,
-        paddingBottom: SPACING.md,
+    sessionStation: { ...TYPOGRAPHY.body, fontWeight: '700' },
+    sessionMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+    sessionMetaText: { ...TYPOGRAPHY.label },
+    sessionDate: { ...TYPOGRAPHY.label },
+    sessionStats: {
+        flexDirection: 'row', gap: SPACING.md, flexWrap: 'wrap',
     },
-    detailGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: SPACING.md,
-        paddingTop: SPACING.md,
+    sessionStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    sessionStatValue: { ...TYPOGRAPHY.body, fontWeight: '600' },
+    ratingRow: {
+        flexDirection: 'row', gap: 2, marginTop: SPACING.sm,
     },
-    detailItem: { width: '45%', gap: 4 },
-    detailLabel: { ...TYPOGRAPHY.label, marginLeft: 4 },
-    detailValue: { ...TYPOGRAPHY.body, fontWeight: '600', marginLeft: 4 },
-    warningOrange: { color: '#f97316' },
+    centerLoader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyText: { ...TYPOGRAPHY.body, textAlign: 'center', marginTop: SPACING.xl },
 });

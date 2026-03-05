@@ -3,6 +3,7 @@ export type VehicleStatus = 'Idle' | 'Charging' | 'Needs Charge';
 export interface Vehicle {
     id: string;
     name: string;
+    make?: string;
     model: string;
     licensePlate: string;
     batteryLevel: number;

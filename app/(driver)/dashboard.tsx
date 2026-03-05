@@ -12,7 +12,9 @@ import { getVehicleDashboard, getTodayStats } from '../../services/driver.servic
 import { getAIRecommendations } from '../../services/stations.service'; // Added
 import { useThemeStore } from '../../store/themeStore';
 import { Vehicle } from '../../types/vehicle.types';
-import { Station } from '../../types/station.types'; // Added
+import { useVehicleStore } from '../../store/vehicleStore';
+import { Station } from '../../types/station.types';
+import { getDriverProfile, getVehiclesByDriver } from '../../services/driver.service';
 import { useRouter } from 'expo-router';
 import { useLanguageStore, Language } from '../../store/languageStore';
 
@@ -52,13 +54,27 @@ const DriverDashboard = () => {
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [stats, setStats] = useState<any>(null);
     const [recommendations, setRecommendations] = useState<Station[]>([]); // Added
+    const [driverProfile, setDriverProfile] = useState<any>(null);
+
+    const { currentVehicleId, setCurrentVehicleId } = useVehicleStore();
 
     const fetchData = async () => {
         try {
+            const profile = await getDriverProfile();
+            setDriverProfile(profile);
+
+            // Always prioritize the driver's first assigned vehicle from the backend
+            const driverVehicles = await getVehiclesByDriver();
+            const vehicleId = driverVehicles?.[0]?.id;
+
+            if (vehicleId) setCurrentVehicleId(vehicleId);
+
+            if (!vehicleId) return;
+
             const [vData, sData, rData] = await Promise.all([
-                getVehicleDashboard('VH001'),
-                getTodayStats('VH001'),
-                getAIRecommendations('VH001')
+                getVehicleDashboard(vehicleId),
+                getTodayStats(vehicleId),
+                getAIRecommendations(vehicleId)
             ]);
             setVehicle(vData);
             setStats(sData);
@@ -93,7 +109,7 @@ const DriverDashboard = () => {
                     <View style={styles.headerTop}>
                         <View>
                             <Text style={[styles.greeting, { color: textSecondary }]}>{t.greeting}</Text>
-                            <Text style={[styles.name, { color: textPrimary }]}>{vehicle?.driverName || 'Driver'}</Text>
+                            <Text style={[styles.name, { color: textPrimary }]}>{driverProfile?.name || vehicle?.driverName || 'Driver'}</Text>
                         </View>
                         <View style={styles.langSwitch}>
                             {(['English', 'हिंदी'] as Language[]).map((l) => (
