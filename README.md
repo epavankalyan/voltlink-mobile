@@ -41,6 +41,7 @@ VoltLink is a premium, glassmorphic EV charging and fleet management application
 | React Native Maps | Map integration |
 | React Native Reanimated | Performant animations |
 | TypeScript | Type safety |
+| Axios | HTTP client |
 
 ---
 
@@ -48,45 +49,101 @@ VoltLink is a premium, glassmorphic EV charging and fleet management application
 
 ### Prerequisites
 
-Ensure you have current versions of **Node.js** and **npm** installed on your machine.
+- **Node.js** ≥ 18 and **npm** ≥ 9
+- **EAS CLI** (for APK/AAB builds): `npm install -g eas-cli`
 
-### 1. Setup Project
+### 1. Clone & Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/epavankalyan/voltlink-mobile.git
 cd voltlink-mobile
-
-# Install dependencies
-npm install
+make install
 ```
 
-### 2. Start the Application
+### 2. Configure Environment
 
-Run the following command to start the development server:
 ```bash
-npx expo start --clear
+cp .env.example .env
 ```
+
+Open `.env` and set at minimum:
+
+```env
+# Required — point to your backend (local or remote)
+EXPO_PUBLIC_API_URL=http://localhost:3001/api/v1
+```
+
+> **Note:** The app will throw an error at startup if `EXPO_PUBLIC_API_URL` is not set.
+
+### 3. Start the Development Server
+
+```bash
+make start
+```
+
+---
+
+## 🔧 Environment Variables
+
+All variables are prefixed with `EXPO_PUBLIC_` and defined in `.env` (copy from `.env.example`).
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `EXPO_PUBLIC_API_URL` | ✅ Yes | — | Full backend API base URL (e.g. `https://api.voltlink.io/api/v1`) |
+| `EXPO_PUBLIC_API_TIMEOUT` | No | `10000` | Request timeout in milliseconds |
+| `EXPO_PUBLIC_DEFAULT_VEHICLE_ID` | No | `VH001` | Fallback vehicle ID before auth resolves |
+| `EXPO_PUBLIC_DEFAULT_FLEET_ID` | No | `1` | Fallback fleet ID for fleet-level calls |
+| `EXPO_PUBLIC_DEFAULT_USER_ID` | No | `11` | Fallback B2C user ID before auth resolves |
+| `EXPO_PUBLIC_DEFAULT_LAT` | No | `12.9716` | Default map latitude (Bangalore) |
+| `EXPO_PUBLIC_DEFAULT_LNG` | No | `77.5946` | Default map longitude (Bangalore) |
+| `EXPO_PUBLIC_ENV` | No | `development` | Runtime environment: `development` \| `staging` \| `production` |
+
+---
+
+## 📦 Building APKs
+
+Run `make help` to see all available targets. Key build commands:
+
+```bash
+# 1. Log in to your Expo / EAS account (one-time)
+make eas-login
+
+# 2. Configure EAS for this project (one-time, creates eas.json)
+make eas-configure
+
+# 3a. Preview APK — signed, distributable (great for testers)
+make build-apk-preview
+
+# 3b. Production APK — store-ready, signed
+make build-apk-production
+
+# 3c. Production AAB — for Google Play Store submission
+make build-aab-production
+```
+
+EAS builds run in the cloud. Download the output from the [EAS dashboard](https://expo.dev/) once the build completes.
+
+### Build Profiles (`eas.json`)
+
+| Profile | Format | Use case |
+|---|---|---|
+| `development` | APK | Internal dev builds with dev client |
+| `preview` | APK | QA / tester distribution |
+| `production` | AAB | Google Play Store submission |
 
 ---
 
 ## 📱 How to Test the Application
 
-There are **two primary ways** to preview and test VoltLink:
-
 ### Method A: Mobile (Expo Go)
-The best way to experience the native feel and interactive maps.
-1.  Install the **Expo Go** app on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)).
-2.  Scan the QR code displayed in your terminal after starting the server.
-3.  **Network Tip**: 
-    *   **Same Network**: If your phone and PC are on the same Wi-Fi, it works automatically.
-    *   **Different Networks**: If you are using mobile data or different Wi-Fi, run `npx expo start --tunnel` instead.
+1. Install **Expo Go** on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)).
+2. Run `make start` and scan the QR code.
+3. Ensure your phone and machine are on the **same Wi-Fi**, or use `npx expo start --tunnel` if on different networks.
 
 ### Method B: Web Browser
-Fastest way to test UI, localization, and application logic.
-1.  Once the server is running, open: [http://localhost:8081](http://localhost:8081)
-2.  **Mobile Emulation**: We recommend the [Web Mobile First](https://www.webmobilefirst.com/en/) extension to test with iPhone/Android device frames.
-3.  **Note**: The interactive map uses a placeholder on Web due to native hardware requirements, but all other features (State, Language, UI) work 100%.
+1. Run `make web` and open [http://localhost:8081](http://localhost:8081).
+2. Use the [Web Mobile First](https://www.webmobilefirst.com/en/) extension for device-frame emulation.
+3. **Note:** The interactive map uses a placeholder on web; all other features work fully.
 
 ---
 
@@ -103,10 +160,17 @@ voltlink-mobile/
 │   ├── map/                    #   Platform-specific Map components
 │   ├── ui/                     #   Core building blocks (Glassmorphism)
 │   └── navigation/             #   Custom floating tab bar
+├── services/                   # API service layer (Axios)
+│   ├── api.service.ts          #   Axios instance & interceptors
+│   ├── stations.service.ts     #   Charging station APIs
+│   ├── driver.service.ts       #   Driver/vehicle APIs
+│   └── b2c.service.ts          #   B2C user APIs
 ├── store/                      # Zustand State Management
-├── mock/                       # Mock Data (Stations, Users)
-├── utils/                      # Theme constants & Utilities
-└── assets/                     # Images & Icons
+├── utils/                      # Theme constants & utilities
+├── assets/                     # Images & Icons
+├── .env.example                # Environment variable template
+├── eas.json                    # EAS Build profiles
+└── Makefile                    # Developer task runner
 ```
 
 ---

@@ -1,46 +1,31 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
-/**
- * Dynamically determine the backend base URL.
- * In Expo Go, uses the debugger host IP so the phone can reach the dev machine.
- */
-function getBaseUrl(): string {
-    // 1. Manually set environment variable (Production / Staging)
-    if (process.env.EXPO_PUBLIC_API_URL) {
-        return process.env.EXPO_PUBLIC_API_URL;
-    }
+// ---------------------------------------------------------------------------
+// Validate required environment variables at startup
+// ---------------------------------------------------------------------------
+const API_URL = process.env.EXPO_PUBLIC_API_URL as string;
+const API_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT ?? '10000', 10);
 
-    // 2. Local Development Auto-detection (Expo Go)
-    const debuggerHost =
-        Constants.expoConfig?.hostUri ??
-        (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;
-
-    if (debuggerHost) {
-        const ip = debuggerHost.split(':')[0];
-        return `http://${ip}:3001/api/v1`;
-    }
-
-    // 3. Fallback for emulators/local
-    if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:3001/api/v1';
-    }
-
-    return 'http://localhost:3001/api/v1';
+if (!API_URL) {
+    throw new Error(
+        '[api.service] EXPO_PUBLIC_API_URL is not set.\n' +
+        'Copy .env.example to .env and set the backend URL before starting the app.'
+    );
 }
 
-const API_URL = getBaseUrl();
-
-export const apiClient = axios.create({
+// ---------------------------------------------------------------------------
+// Axios instance
+// ---------------------------------------------------------------------------
+export const apiClient: AxiosInstance = axios.create({
     baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    timeout: 10000,
+    headers: { 'Content-Type': 'application/json' },
+    timeout: API_TIMEOUT,
 });
 
+// ---------------------------------------------------------------------------
+// Request interceptor — attach Bearer token from secure storage
+// ---------------------------------------------------------------------------
 apiClient.interceptors.request.use(async (config) => {
     const token = await AsyncStorage.getItem('auth_token');
     if (token) {
@@ -49,13 +34,22 @@ apiClient.interceptors.request.use(async (config) => {
     return config;
 });
 
+// ---------------------------------------------------------------------------
+// Response interceptor — centralised error handling
+// ---------------------------------------------------------------------------
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            // Handle redirect to login or role selector
+        const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+        const url = error.config?.url ?? '';
+        const status = error.response?.status;
+
+        if (status === 401) {
+            // TODO: dispatch a logout / redirect-to-login action
+            AsyncStorage.removeItem('auth_token');
         }
-        console.warn(`API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.message);
+
+        console.error(`[API] ${method} ${url} → ${status ?? 'NETWORK ERROR'}`, error.message);
         return Promise.reject(error);
     }
 );

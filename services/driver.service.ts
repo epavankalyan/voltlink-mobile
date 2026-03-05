@@ -1,7 +1,10 @@
 import { apiClient } from './api.service';
 
-export const getVehicleDashboard = async (vehicleId: string) => {
-    return apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
+const DEFAULT_VEHICLE_ID = process.env.EXPO_PUBLIC_DEFAULT_VEHICLE_ID ?? 'VH001';
+const DEFAULT_FLEET_ID = process.env.EXPO_PUBLIC_DEFAULT_FLEET_ID ?? '1';
+
+export const getVehicleDashboard = async (vehicleId: string = DEFAULT_VEHICLE_ID) =>
+    apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
         const d = res.data.data;
         return {
             id: d.id,
@@ -13,22 +16,21 @@ export const getVehicleDashboard = async (vehicleId: string) => {
             status: d.status as any,
             lastChargedAt: d.battery?.last_charged || 'Unknown',
             driverName: d.driver?.name || 'Driver',
-            driverEmail: d.driver?.email || 'driver@voltlink.com'
+            driverEmail: d.driver?.email || 'driver@voltlink.com',
         };
     });
-};
 
-export const getTodayStats = async (vehicleId: string) => {
-    return apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
+export const getTodayStats = async (vehicleId: string = DEFAULT_VEHICLE_ID) =>
+    apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
         const d = res.data.data;
         return {
-            distanceKm: 0, // Not available in backend model yet
-            kwhConsumed: Math.round((d.battery?.capacity_kwh || 0) * (d.battery?.percentage || 0) / 100 * 10) / 10,
-            costPerKwh: 12.0 // Still hardcoded as there is no vehicle-specific cost API
+            distanceKm: 0,
+            kwhConsumed: Math.round(
+                (d.battery?.capacity_kwh || 0) * (d.battery?.percentage || 0) / 100 * 10
+            ) / 10,
+            costPerKwh: 12.0,
         };
     });
-};
 
-export const getNotifications = async (fleetId: string = '1') => {
-    return apiClient.get(`/fleets/${fleetId}/alerts`).then(res => res.data);
-};
+export const getNotifications = async (fleetId: string = DEFAULT_FLEET_ID) =>
+    apiClient.get(`/fleets/${fleetId}/alerts`).then(res => res.data);

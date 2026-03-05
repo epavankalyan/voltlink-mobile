@@ -1,10 +1,6 @@
 import { apiClient } from './api.service';
 import { Station } from '../types/station.types';
 
-/**
- * Fetches list of charging stations
- * @param params Optional filters like CPO, charger types, etc.
- */
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -16,15 +12,17 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
     return parseFloat((R * c).toFixed(1));
 };
 
-// Assuming user location (Bangalore)
-const MOCK_USER_LAT = 12.9716;
-const MOCK_USER_LNG = 77.5946;
+// Default user location from env (fallback: Bangalore)
+const USER_LAT = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LAT ?? '12.9716');
+const USER_LNG = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LNG ?? '77.5946');
 
-export const getStations = async (params?: any): Promise<Station[]> => {
-    return apiClient.get('/charging-stations', { params }).then(res => {
+export const getStations = async (params?: any): Promise<Station[]> =>
+    apiClient.get('/charging-stations', { params }).then(res => {
         const stations = res.data.data || [];
         return stations.map((s: any) => {
-            const dist = s.latitude && s.longitude ? calculateDistance(MOCK_USER_LAT, MOCK_USER_LNG, s.latitude, s.longitude) : 5.2;
+            const dist = s.latitude && s.longitude
+                ? calculateDistance(USER_LAT, USER_LNG, s.latitude, s.longitude)
+                : 5.2;
             return {
                 ...s,
                 id: s.id.toString(),
@@ -33,21 +31,19 @@ export const getStations = async (params?: any): Promise<Station[]> => {
                 availableChargers: s.available_chargers || 0,
                 totalChargers: s.total_chargers || 0,
                 distanceKm: dist,
-                etaMinutes: Math.round(dist * 2.5), // Estimate: 2.5 min per km
+                etaMinutes: Math.round(dist * 2.5),
                 pricePerKwh: s.price_per_kwh || 0,
-                coordinates: {
-                    latitude: s.latitude,
-                    longitude: s.longitude
-                }
+                coordinates: { latitude: s.latitude, longitude: s.longitude },
             };
         });
     });
-};
 
-export const getStationById = async (id: string): Promise<Station> => {
-    return apiClient.get(`/charging-stations/${id}`).then(res => {
+export const getStationById = async (id: string): Promise<Station> =>
+    apiClient.get(`/charging-stations/${id}`).then(res => {
         const d = res.data;
-        const dist = d.latitude && d.longitude ? calculateDistance(MOCK_USER_LAT, MOCK_USER_LNG, d.latitude, d.longitude) : 5.2;
+        const dist = d.latitude && d.longitude
+            ? calculateDistance(USER_LAT, USER_LNG, d.latitude, d.longitude)
+            : 5.2;
         return {
             ...d,
             id: d.id.toString(),
@@ -55,25 +51,19 @@ export const getStationById = async (id: string): Promise<Station> => {
             chargerTypes: [],
             distanceKm: dist,
             etaMinutes: Math.round(dist * 2.5),
-            coordinates: {
-                latitude: d.latitude,
-                longitude: d.longitude
-            }
+            coordinates: { latitude: d.latitude, longitude: d.longitude },
         };
     });
-};
 
-export const getAIRecommendations = async (vehicleId: string = 'VH001'): Promise<Station[]> => {
-    return apiClient.get(`/vehicles/${vehicleId}/recommendations`).then(res => {
+export const getAIRecommendations = async (
+    vehicleId: string = process.env.EXPO_PUBLIC_DEFAULT_VEHICLE_ID ?? 'VH001'
+): Promise<Station[]> =>
+    apiClient.get(`/vehicles/${vehicleId}/recommendations`).then(res => {
         const data = res.data || [];
         return data.map((s: any) => {
-            // Recommendation backend structure: models.AIRecommendation + StationName/StationID
-            // AIRecommendation has ReasonSummary, PredictedCost, PredictedWaitTime
-            // coordinates usually come from EVSE -> Location (preload)
-            const lat = s.evse?.latitude || s.latitude || 12.97;
-            const lng = s.evse?.longitude || s.longitude || 77.60;
-            const dist = calculateDistance(MOCK_USER_LAT, MOCK_USER_LNG, lat, lng);
-
+            const lat = s.evse?.latitude || s.latitude || USER_LAT;
+            const lng = s.evse?.longitude || s.longitude || USER_LNG;
+            const dist = calculateDistance(USER_LAT, USER_LNG, lat, lng);
             return {
                 ...s,
                 id: s.station_id || s.id?.toString(),
@@ -88,11 +78,7 @@ export const getAIRecommendations = async (vehicleId: string = 'VH001'): Promise
                 distanceKm: dist,
                 etaMinutes: Math.round(dist * 2.5),
                 nextAvailableMinutes: s.predicted_wait_time || 0,
-                coordinates: {
-                    latitude: lat,
-                    longitude: lng
-                }
+                coordinates: { latitude: lat, longitude: lng },
             };
         });
     });
-};
