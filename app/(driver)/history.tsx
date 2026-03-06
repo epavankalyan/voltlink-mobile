@@ -45,7 +45,7 @@ export default function DriverHistory() {
         setLoading(true);
         try {
             const status = filter === 'all' ? undefined : filter;
-            const data = await getDriverSessions(undefined, undefined, status);
+            const data = await getDriverSessions(undefined, undefined as any, status as any);
             const mapped: SessionItem[] = (data || []).map((s: any) => {
                 const startTime = s.start_time ? new Date(s.start_time) : new Date();
                 const endTime = s.end_time ? new Date(s.end_time) : null;

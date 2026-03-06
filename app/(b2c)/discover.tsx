@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, FlatList, TextInput, Platform, Dimensions, Alert
+    StyleSheet, View, Text, TouchableOpacity, TextInput, Platform, Dimensions, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, MapPin, Zap, Clock, ChevronRight, Star, AlertCircle, Car } from 'lucide-react-native';
+import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 import MapComponent from '../../components/map/MapComponent';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -62,6 +63,10 @@ export default function DiscoverScreen() {
     const [showReport, setShowReport] = useState(false);
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // BottomSheet ref & points
+    const bottomSheetRef = useRef<BottomSheet>(null);
+    const snapPoints = useMemo(() => ['15%', '50%', '85%'], []);
 
     const fetchData = async () => {
         setLoading(true);
@@ -197,72 +202,80 @@ export default function DiscoverScreen() {
     };
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: textPrimary }]}>{t.title}</Text>
-                <Text style={[styles.subtitle, { color: textSecondary }]}>{filtered.length} {t.nearYou}</Text>
-            </View>
-
-            <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderColor }]}>
-                <Search size={16} color={textSecondary} />
-                <TextInput
-                    placeholder={t.searchPlaceholder}
-                    placeholderTextColor={isDark ? COLORS.textMutedDark : 'rgba(0,0,0,0.35)'}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    style={[styles.searchInput, { color: textPrimary }]}
+        <SafeAreaView style={styles.container} edges={['top']}>
+            {/* Full Screen Map Base Layer */}
+            <View style={StyleSheet.absoluteFillObject}>
+                <MapComponent
+                    isDark={isDark}
+                    stations={filtered}
+                    familyVehicles={familyVehicles}
+                    t={t}
+                    COLORS={COLORS}
+                    darkMapStyle={darkMapStyle}
+                    markerContainerStyle={styles.markerContainer}
+                    MarkerZapIcon={<Zap size={14} color="#000" />}
+                    MarkerCarIcon={<Car size={14} color="#FFF" />}
                 />
             </View>
 
-            <FlatList
-                data={filtered}
-                keyExtractor={s => s.id}
-                ListHeaderComponent={() => (
-                    <>
-                        {/* Map View Section */}
-                        <View style={[styles.mapContainer, { borderColor }]}>
-                            <MapComponent
-                                isDark={isDark}
-                                stations={stations}
-                                familyVehicles={familyVehicles}
-                                t={t}
-                                COLORS={COLORS}
-                                darkMapStyle={darkMapStyle}
-                                markerContainerStyle={styles.markerContainer}
-                                MarkerZapIcon={<Zap size={14} color="#000" />}
-                                MarkerCarIcon={<Car size={14} color="#FFF" />}
-                            />
-                        </View>
+            {/* Overlays */}
+            <View style={styles.overlayHeader}>
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: textPrimary, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{t.title}</Text>
+                    <Text style={[styles.subtitle, { color: textSecondary, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{filtered.length} {t.nearYou}</Text>
+                </View>
 
-                        <View style={styles.filterRow}>
-                            {FILTERS.map(f => (
-                                <TouchableOpacity
-                                    key={f}
-                                    style={[
-                                        styles.filterPill,
-                                        { borderColor },
-                                        activeFilter === f && { backgroundColor: COLORS.primaryGreen, borderColor: COLORS.primaryGreen }
-                                    ]}
-                                    onPress={() => setActiveFilter(f)}
-                                >
-                                    <Text style={[styles.filterText, { color: activeFilter === f ? '#000' : textSecondary }]}>{f}</Text>
-                                </TouchableOpacity>
-                            ))}
+                <GlassCard intensity={80} style={[styles.searchContainer, { borderColor }] as any}>
+                    <Search size={16} color={textSecondary} />
+                    <TextInput
+                        placeholder={t.searchPlaceholder}
+                        placeholderTextColor={isDark ? COLORS.textMutedDark : 'rgba(0,0,0,0.35)'}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        style={[styles.searchInput, { color: textPrimary }]}
+                    />
+                </GlassCard>
+
+                <View style={styles.filterContainer}>
+                    {FILTERS.map(f => (
+                        <TouchableOpacity
+                            key={f}
+                            style={[
+                                styles.filterPill,
+                                { borderColor },
+                                activeFilter === f && { backgroundColor: COLORS.primaryGreen, borderColor: COLORS.primaryGreen },
+                                activeFilter !== f && { backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }
+                            ]}
+                            onPress={() => setActiveFilter(f)}
+                        >
+                            <Text style={[styles.filterText, { color: activeFilter === f ? '#000' : textPrimary }]}>{f}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Draggable Bottom Sheet for the Station List */}
+            <BottomSheet
+                ref={bottomSheetRef}
+                index={1} // Start at 50%
+                snapPoints={snapPoints}
+                backgroundStyle={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }}
+                handleIndicatorStyle={{ backgroundColor: textSecondary }}
+            >
+                <BottomSheetFlatList
+                    data={filtered}
+                    keyExtractor={(s: Station) => s.id}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    renderItem={renderStation}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Zap size={40} color={COLORS.textMutedDark} />
+                            <Text style={[styles.emptyText, { color: textSecondary }]}>{t.noMatch}</Text>
                         </View>
-                    </>
-                )}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                renderItem={renderStation}
-                refreshing={loading}
-                onRefresh={fetchData}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Zap size={40} color={COLORS.textMutedDark} />
-                        <Text style={[styles.emptyText, { color: textSecondary }]}>{t.noMatch}</Text>
-                    </View>
-                }
-            />
+                    }
+                />
+            </BottomSheet>
 
             <RatingModal
                 visible={showRating}
@@ -294,45 +307,46 @@ const darkMapStyle = [
 ];
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    container: { flex: 1, backgroundColor: '#1a1a1a' },
+    overlayHeader: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 30, // Account for safe area
+        left: 0,
+        right: 0,
+        zIndex: 10,
+    },
     header: {
         flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
-        paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm,
+        paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm,
     },
     title: { ...TYPOGRAPHY.hero, fontSize: 26 },
     subtitle: { ...TYPOGRAPHY.label, fontSize: 13 },
-    searchBar: {
+    searchContainer: {
         flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
         marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
-        paddingHorizontal: SPACING.md, height: 46,
+        paddingHorizontal: SPACING.md, height: 50,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1,
     },
-    searchInput: { flex: 1, ...TYPOGRAPHY.body, paddingVertical: 0, fontSize: 14 },
-    mapContainer: {
-        height: 200,
-        marginHorizontal: SPACING.lg,
-        marginBottom: SPACING.lg,
-        borderRadius: BORDER_RADIUS.xl,
-        borderWidth: 1,
-        overflow: 'hidden',
-    },
-    map: { ...StyleSheet.absoluteFillObject },
+    searchInput: { flex: 1, ...TYPOGRAPHY.body, paddingVertical: 0, fontSize: 15 },
     markerContainer: {
         padding: 6,
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#000',
     },
-    filterRow: {
-        flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.sm, marginBottom: SPACING.md,
+    filterContainer: {
+        flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.sm, flexWrap: 'wrap',
     },
     filterPill: {
-        paddingHorizontal: SPACING.md, paddingVertical: 6,
-        borderRadius: 20, borderWidth: 1,
+        paddingHorizontal: SPACING.md, paddingVertical: 8,
+        borderRadius: 20, borderWidth: 1, marginBottom: 8,
     },
     filterText: { ...TYPOGRAPHY.label, fontWeight: '600', fontSize: 12 },
-    listContent: { paddingBottom: 120 },
-    card: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: BORDER_RADIUS.xl, borderWidth: 1, padding: SPACING.md },
+    listContent: {
+        paddingTop: SPACING.md,
+        paddingBottom: 40
+    },
+    card: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: BORDER_RADIUS.xl, borderWidth: 1, padding: SPACING.md, backgroundColor: 'rgba(26, 26, 26, 0.4)' },
     cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SPACING.sm },
     nameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: SPACING.sm },
     statusDot: {
