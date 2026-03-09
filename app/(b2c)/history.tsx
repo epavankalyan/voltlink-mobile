@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import {
     StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, Star, Calendar, XCircle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getUserSessions, getUserBookings } from '../../services/b2c.service';
+import { getUserSessions } from '../../services/b2c.service';
+import { getBookings, cancelBooking } from '../../services/booking.service';
 import { format } from 'date-fns';
 
 const TABS = ['Active', 'Past'];
@@ -28,6 +30,7 @@ type HistoryItem = {
 };
 
 export default function HistoryScreen() {
+    const router = useRouter();
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
     const [activeTab, setActiveTab] = useState('Active');
@@ -45,10 +48,12 @@ export default function HistoryScreen() {
         try {
             if (activeTab === 'Active') {
                 // Fetch both pending bookings and active sessions
-                const [bookings, sessions] = await Promise.all([
-                    getUserBookings(undefined, 'pending'),
+                const [bookingsResponse, sessions] = await Promise.all([
+                    getBookings({ status: 'pending' }),
                     getUserSessions(undefined, 'active')
                 ]);
+
+                const bookings = bookingsResponse.data || [];
 
                 const mappedItems: HistoryItem[] = [
                     ...sessions.map((s: any) => ({
@@ -103,7 +108,18 @@ export default function HistoryScreen() {
                 {
                     text: 'Cancel (₹20 Penalty)',
                     style: 'destructive',
-                    onPress: () => Alert.alert('Cancelled', 'Your booking has been cancelled and a ₹20 penalty has been applied.')
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await cancelBooking(id, { reason: 'User requested' });
+                            Alert.alert('Cancelled', 'Your booking has been cancelled and a ₹20 penalty has been applied.');
+                            fetchData();
+                        } catch (error) {
+                            console.error('Cancel booking error:', error);
+                            Alert.alert('Error', 'Failed to cancel the booking.');
+                            setLoading(false);
+                        }
+                    }
                 },
             ]
         );
@@ -113,37 +129,45 @@ export default function HistoryScreen() {
         if (activeTab === 'Active') {
             const isActive = item.status === 'active';
             return (
-                <GlassCard style={styles.bookingCard as any} intensity={25}>
-                    <View style={styles.cardHeader}>
-                        <View style={[styles.iconBox, { backgroundColor: isActive ? COLORS.successGreen + '20' : COLORS.brandBlue + '20' }]}>
-                            {isActive ? <Zap size={18} color={COLORS.successGreen} /> : <Calendar size={18} color={COLORS.brandBlue} />}
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => router.push({
+                        pathname: '/(b2c)/session',
+                        params: { sessionId: item.id }
+                    })}
+                >
+                    <GlassCard style={styles.bookingCard as any} intensity={25}>
+                        <View style={styles.cardHeader}>
+                            <View style={[styles.iconBox, { backgroundColor: isActive ? COLORS.successGreen + '20' : COLORS.brandBlue + '20' }]}>
+                                {isActive ? <Zap size={18} color={COLORS.successGreen} /> : <Calendar size={18} color={COLORS.brandBlue} />}
+                            </View>
+                            <View style={styles.headerInfo}>
+                                <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
+                                <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
+                            </View>
+                            {!isActive && (
+                                <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
+                                    <XCircle size={22} color={COLORS.alertRed} />
+                                </TouchableOpacity>
+                            )}
                         </View>
-                        <View style={styles.headerInfo}>
-                            <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
-                            <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
+
+                        <View style={styles.bookingDetails}>
+                            <View style={styles.detailRow}>
+                                <Zap size={14} color={isActive ? COLORS.successGreen : COLORS.brandBlue} />
+                                <Text style={[styles.detailText, { color: textSecondary }]}>
+                                    {item.type} {item.cost ? `· ₹${item.cost}` : ''} {item.kWh ? `· ${item.kWh} kWh` : ''}
+                                </Text>
+                            </View>
                         </View>
+
                         {!isActive && (
-                            <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
-                                <XCircle size={22} color={COLORS.alertRed} />
+                            <TouchableOpacity style={styles.navigateBtn}>
+                                <Text style={styles.navigateText}>View Directions →</Text>
                             </TouchableOpacity>
                         )}
-                    </View>
-
-                    <View style={styles.bookingDetails}>
-                        <View style={styles.detailRow}>
-                            <Zap size={14} color={isActive ? COLORS.successGreen : COLORS.brandBlue} />
-                            <Text style={[styles.detailText, { color: textSecondary }]}>
-                                {item.type} {item.cost ? `· ₹${item.cost}` : ''} {item.kWh ? `· ${item.kWh} kWh` : ''}
-                            </Text>
-                        </View>
-                    </View>
-
-                    {!isActive && (
-                        <TouchableOpacity style={styles.navigateBtn}>
-                            <Text style={styles.navigateText}>View Directions →</Text>
-                        </TouchableOpacity>
-                    )}
-                </GlassCard>
+                    </GlassCard>
+                </TouchableOpacity>
             );
         }
 

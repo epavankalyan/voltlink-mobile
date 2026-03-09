@@ -163,22 +163,6 @@ export default function CreditsScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* V2G Card */}
-                        <GlassCard style={styles.v2gCard as any} intensity={20}>
-                            <View style={styles.v2gRow}>
-                                <Leaf size={20} color={COLORS.successGreen} />
-                                <View style={styles.v2gInfo}>
-                                    <Text style={[styles.v2gTitle, { color: textPrimary }]}>Vehicle-to-Grid (V2G)</Text>
-                                    <Text style={[styles.v2gSub, { color: textSecondary }]}>
-                                        Current rate: ₹6.50/kWh · Est. earn ₹180 this month
-                                    </Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity style={styles.v2gBtn}
-                                onPress={() => Alert.alert('V2G', 'Navigate to a charging session to enable V2G.')}>
-                                <Text style={styles.v2gBtnText}>Start V2G Session →</Text>
-                            </TouchableOpacity>
-                        </GlassCard>
 
                         {/* Sustainability */}
                         <GlassCard style={styles.sustainCard as any} intensity={20}>
@@ -223,13 +207,6 @@ const styles = StyleSheet.create({
     actionBtn: { flex: 1, alignItems: 'center', padding: SPACING.md, borderRadius: BORDER_RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     actionIcon: { marginBottom: 6 },
     actionLabel: { ...TYPOGRAPHY.label, fontWeight: '700', fontSize: 13 },
-    v2gCard: { padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, marginBottom: SPACING.md },
-    v2gRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm, marginBottom: SPACING.md },
-    v2gInfo: { flex: 1 },
-    v2gTitle: { ...TYPOGRAPHY.body, fontWeight: '700' },
-    v2gSub: { ...TYPOGRAPHY.label, marginTop: 2 },
-    v2gBtn: { alignSelf: 'flex-start', backgroundColor: 'rgba(0,255,136,0.12)', paddingHorizontal: SPACING.md, paddingVertical: 8, borderRadius: BORDER_RADIUS.md },
-    v2gBtnText: { color: COLORS.successGreen, fontWeight: '700', fontSize: 13 },
     sustainCard: { padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, marginBottom: SPACING.md },
     sustainRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
     sustainTitle: { ...TYPOGRAPHY.body, fontWeight: '700' },

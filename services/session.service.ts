@@ -40,7 +40,6 @@ export interface CreateSessionRequest {
     vehicle_id: string;
     user_id: number;
     booking_id?: string;
-    session_type?: 'CHARGING' | 'V2G';
     start_soc?: number;
 }
 
@@ -74,21 +73,6 @@ export const getUserActiveSessions = async (
     status?: string,
 ) =>
     apiClient
-        .get(`/b2c/users/${userId}/session`, { params: { status } })
+        .get(`/users/${userId}/sessions`, { params: { status } })
         .then(res => res.data);
 
-// ---------------------------------------------------------------------------
-// V2G rate
-// ---------------------------------------------------------------------------
-
-export interface V2GRate {
-    rate_per_kwh: number;
-    currency?: string;
-    valid_until?: string;
-}
-
-/**
- * Get the current Vehicle-to-Grid rate.
- */
-export const getV2GRate = async (): Promise<V2GRate> =>
-    apiClient.get('/b2c/v2g/rate').then(res => res.data);

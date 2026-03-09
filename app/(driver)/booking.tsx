@@ -9,7 +9,8 @@ import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-na
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getStationSlots, createSession, SlotInfo, ConnectorSlots } from '../../services/session.service';
+import { getStationSlots, SlotInfo, ConnectorSlots } from '../../services/session.service';
+import { createBooking } from '../../services/booking.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getStationById } from '../../services/stations.service';
 
@@ -91,15 +92,30 @@ export default function DriverBooking() {
         try {
             if (!currentVehicleId) throw new Error('No vehicle selected');
 
-            await createSession({
+            const slot = displaySlots.find(s => s.id === selectedSlot);
+            let timeStr = slot?.time || "12:00";
+            let [hours, minutes] = timeStr.split(':');
+            hours = hours || "12";
+            minutes = minutes?.substring(0, 2) || "00";
+
+            if (timeStr.toLowerCase().includes('pm') && parseInt(hours) < 12) {
+                hours = (parseInt(hours) + 12).toString();
+            } else if (timeStr.toLowerCase().includes('am') && parseInt(hours) === 12) {
+                hours = "00";
+            }
+
+            const now = new Date();
+            now.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+            await createBooking({
                 connector_id: selectedConnectorId || connector?.connector_id || '',
                 vehicle_id: currentVehicleId,
                 user_id: DEFAULT_USER_ID,
-                session_type: 'CHARGING',
+                booking_time: now.toISOString(),
             });
             setConfirmed(true);
             setTimeout(() => {
-                router.replace('/(driver)/session');
+                router.replace('/(driver)/history');
             }, 1800);
         } catch (error) {
             console.error('Error creating session:', error);

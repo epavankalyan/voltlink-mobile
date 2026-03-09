@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getUserActiveSessions, stopSession, getV2GRate } from '../../services/session.service';
+import { getUserActiveSessions, stopSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -31,8 +31,6 @@ export default function B2CSession() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [sessionEnded, setSessionEnded] = useState(false);
-    const [v2gEnabled, setV2gEnabled] = useState(false);
-    const [v2gRate, setV2gRate] = useState(0);
     const [rating, setRating] = useState(0);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
@@ -47,12 +45,7 @@ export default function B2CSession() {
         );
     }, []);
 
-    // Fetch V2G rate once
-    useEffect(() => {
-        getV2GRate()
-            .then(data => setV2gRate(data.rate_per_kwh || 0))
-            .catch(err => console.warn('V2G rate unavailable:', err));
-    }, []);
+
 
     // Poll active session
     const fetchSession = useCallback(async () => {
@@ -114,7 +107,6 @@ export default function B2CSession() {
         ? Math.max(0, Math.round(((100 - chargePercent) / 100 * (session?.vehicle?.battery_capacity_kwh || 40)) / chargingRate * 60))
         : Math.max(0, Math.round((100 - chargePercent) * 2.8));
 
-    const v2gEarnings = v2gEnabled ? Math.round(kwhDelivered * v2gRate) : 0;
 
     const handleStop = () => {
         Alert.alert('Stop Charging?', 'Are you sure you want to end this charging session?', [
@@ -160,11 +152,7 @@ export default function B2CSession() {
                             <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost}</Text>
                             <Text style={[styles.ratingKwh, { color: textSecondary }]}>{kwhDelivered} kWh delivered</Text>
 
-                            {v2gEarnings > 0 && (
-                                <Text style={[styles.v2gEarningsSummary, { color: COLORS.successGreen }]}>
-                                    V2G Earnings: ₹{v2gEarnings}
-                                </Text>
-                            )}
+
 
                             <Text style={[styles.ratingPrompt, { color: textSecondary }]}>Rate your experience</Text>
                             <View style={styles.starsRow}>
@@ -263,29 +251,6 @@ export default function B2CSession() {
                     </Text>
                 </GlassCard>
 
-                {/* V2G Toggle */}
-                {v2gRate > 0 && (
-                    <GlassCard style={styles.v2gCard as any} intensity={25}>
-                        <View style={styles.v2gRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={[styles.v2gTitle, { color: textPrimary }]}>V2G Mode</Text>
-                                <Text style={[styles.v2gSub, { color: textSecondary }]}>
-                                    Earn ₹{v2gRate}/kWh by feeding power back to the grid
-                                </Text>
-                            </View>
-                            <Switch
-                                value={v2gEnabled}
-                                onValueChange={setV2gEnabled}
-                                trackColor={{ true: COLORS.successGreen, false: 'rgba(255,255,255,0.15)' }}
-                            />
-                        </View>
-                        {v2gEnabled && v2gEarnings > 0 && (
-                            <Text style={[styles.v2gEarnings, { color: COLORS.successGreen }]}>
-                                V2G earnings so far: ₹{v2gEarnings}
-                            </Text>
-                        )}
-                    </GlassCard>
-                )}
 
                 {/* Stop Button */}
                 <TouchableOpacity style={styles.stopBtn} onPress={handleStop}>
@@ -337,15 +302,7 @@ const styles = StyleSheet.create({
         width: '100%', marginBottom: SPACING.md,
     },
     etaText: { ...TYPOGRAPHY.body, flex: 1 },
-    v2gCard: {
-        padding: SPACING.md, borderRadius: BORDER_RADIUS.md,
-        width: '100%', marginBottom: SPACING.xl,
-    },
-    v2gRow: { flexDirection: 'row', alignItems: 'center' },
-    v2gTitle: { ...TYPOGRAPHY.body, fontWeight: '700' },
-    v2gSub: { ...TYPOGRAPHY.label, marginTop: 2 },
-    v2gEarnings: { ...TYPOGRAPHY.body, fontWeight: '700', marginTop: SPACING.sm },
-    v2gEarningsSummary: { ...TYPOGRAPHY.body, fontWeight: '700', marginTop: SPACING.sm },
+
     stopBtn: {
         width: '100%', height: 52, borderRadius: BORDER_RADIUS.xl,
         borderWidth: 1.5, borderColor: COLORS.alertRed,

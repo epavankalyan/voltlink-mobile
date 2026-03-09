@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator, Alert
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, MapPin, Star } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { useThemeStore } from '../../store/themeStore';
+import { useVehicleStore } from '../../store/vehicleStore';
 import { getDriverSessions } from '../../services/driver.service';
+import { getBookings, cancelBooking } from '../../services/booking.service';
+import { format } from 'date-fns';
 
 type SessionItem = {
     id: string;
@@ -20,6 +24,7 @@ type SessionItem = {
     rating: number;
     carbonSaved: number;
     connectorType: string;
+    status?: string;
 };
 
 type FilterKey = 'all' | 'completed' | 'active';
@@ -31,7 +36,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 export default function DriverHistory() {
+    const router = useRouter();
     const { theme } = useThemeStore();
+    const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const [filter, setFilter] = useState<FilterKey>('all');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -45,8 +52,15 @@ export default function DriverHistory() {
         setLoading(true);
         try {
             const status = filter === 'all' ? undefined : filter;
-            const data = await getDriverSessions(undefined, undefined as any, status as any);
-            const mapped: SessionItem[] = (data || []).map((s: any) => {
+
+            const [data, bookingsResponse] = await Promise.all([
+                getDriverSessions(undefined, currentVehicleId || '', status as any),
+                (filter === 'all' || filter === 'active') ? getBookings({ status: 'pending' }) : Promise.resolve({ data: [] })
+            ]);
+
+            const bookings = bookingsResponse.data || [];
+
+            const sessionMapped: SessionItem[] = (data || []).map((s: any) => {
                 const startTime = s.start_time ? new Date(s.start_time) : new Date();
                 const endTime = s.end_time ? new Date(s.end_time) : null;
                 const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
@@ -66,9 +80,24 @@ export default function DriverHistory() {
                     rating: 0,
                     carbonSaved: s.carbon_saved_kg || 0,
                     connectorType: s.connector?.connector_type || 'CCS2',
+                    status: s.status || 'completed'
                 };
             });
-            setSessions(mapped);
+
+            const bookingMapped: SessionItem[] = bookings.map((b: any) => ({
+                id: b.id,
+                stationName: b.connector?.station_name || 'Booked Station',
+                date: format(new Date(b.booking_time), 'dd MMM yyyy, hh:mm a'),
+                duration: 'Not Started',
+                kwh: 0,
+                cost: 0,
+                rating: 0,
+                carbonSaved: 0,
+                connectorType: b.connector?.connector_type || 'Reserved',
+                status: 'pending'
+            }));
+
+            setSessions([...bookingMapped, ...sessionMapped]);
         } catch (error) {
             console.error('Error loading history:', error);
         } finally {
@@ -80,53 +109,93 @@ export default function DriverHistory() {
         fetchSessions();
     }, [filter]);
 
-    const totalKwh = sessions.reduce((s, i) => s + i.kwh, 0);
-    const totalCost = sessions.reduce((s, i) => s + i.cost, 0);
-    const totalCarbon = sessions.reduce((s, i) => s + i.carbonSaved, 0);
+    const handleCancelBooking = (id: string) => {
+        Alert.alert(
+            'Cancel Booking?',
+            'Cancelling within 15 minutes of the slot incurs a ₹20 penalty. Do you want to proceed?',
+            [
+                { text: 'Keep Booking', style: 'cancel' },
+                {
+                    text: 'Cancel (₹20 Penalty)',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await cancelBooking(id, { reason: 'User requested' });
+                            Alert.alert('Cancelled', 'Your booking has been cancelled and a ₹20 penalty has been applied.');
+                            fetchSessions();
+                        } catch (error) {
+                            console.error('Cancel booking error:', error);
+                            Alert.alert('Error', 'Failed to cancel the booking.');
+                            setLoading(false);
+                        }
+                    }
+                },
+            ]
+        );
+    };
+
+    const totalKwh = sessions.reduce((s, i) => s + (i.kwh || 0), 0);
+    const totalCost = sessions.reduce((s, i) => s + (i.cost || 0), 0);
+    const totalCarbon = sessions.reduce((s, i) => s + (i.carbonSaved || 0), 0);
 
     const renderSession = ({ item }: { item: SessionItem }) => (
-        <GlassCard style={styles.sessionCard as any} intensity={20}>
-            <View style={styles.sessionHeader}>
-                <View style={styles.sessionInfo}>
-                    <Text style={[styles.sessionStation, { color: textPrimary }]}>{item.stationName}</Text>
-                    <View style={styles.sessionMeta}>
-                        <MapPin size={12} color={textSecondary} />
-                        <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.connectorType}</Text>
-                        <Clock size={12} color={textSecondary} />
-                        <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
+        <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => router.push({
+                pathname: '/(driver)/session',
+                params: { sessionId: item.id }
+            })}
+        >
+            <GlassCard style={styles.sessionCard as any} intensity={20}>
+                <View style={styles.sessionHeader}>
+                    <View style={styles.sessionInfo}>
+                        <Text style={[styles.sessionStation, { color: textPrimary }]}>{item.stationName}</Text>
+                        <View style={styles.sessionMeta}>
+                            <MapPin size={12} color={textSecondary} />
+                            <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.connectorType}</Text>
+                            <Clock size={12} color={textSecondary} />
+                            <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
+                        </View>
                     </View>
+                    {item.status === 'pending' ? (
+                        <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
+                            <Text style={{ color: COLORS.alertRed, ...TYPOGRAPHY.label }}>Cancel</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
+                    )}
                 </View>
-                <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
-            </View>
 
-            <View style={styles.sessionStats}>
-                <View style={styles.sessionStat}>
-                    <Zap size={14} color={COLORS.brandBlue} />
-                    <Text style={[styles.sessionStatValue, { color: textPrimary }]}>{item.kwh} kWh</Text>
-                </View>
-                <View style={styles.sessionStat}>
-                    <Text style={[styles.sessionStatValue, { color: COLORS.successGreen }]}>₹{item.cost.toFixed(0)}</Text>
-                </View>
-                {item.carbonSaved > 0 && (
+                <View style={styles.sessionStats}>
                     <View style={styles.sessionStat}>
-                        <Text style={[styles.sessionStatValue, { color: textSecondary }]}>🌱 {item.carbonSaved.toFixed(1)} kg</Text>
+                        <Zap size={14} color={COLORS.brandBlue} />
+                        <Text style={[styles.sessionStatValue, { color: textPrimary }]}>{item.kwh} kWh</Text>
+                    </View>
+                    <View style={styles.sessionStat}>
+                        <Text style={[styles.sessionStatValue, { color: COLORS.successGreen }]}>₹{item.cost.toFixed(0)}</Text>
+                    </View>
+                    {item.carbonSaved > 0 && (
+                        <View style={styles.sessionStat}>
+                            <Text style={[styles.sessionStatValue, { color: textSecondary }]}>🌱 {item.carbonSaved.toFixed(1)} kg</Text>
+                        </View>
+                    )}
+                </View>
+
+                {item.rating > 0 && (
+                    <View style={styles.ratingRow}>
+                        {[1, 2, 3, 4, 5].map(n => (
+                            <Star
+                                key={n}
+                                size={14}
+                                color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
+                                fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
+                            />
+                        ))}
                     </View>
                 )}
-            </View>
-
-            {item.rating > 0 && (
-                <View style={styles.ratingRow}>
-                    {[1, 2, 3, 4, 5].map(n => (
-                        <Star
-                            key={n}
-                            size={14}
-                            color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
-                            fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
-                        />
-                    ))}
-                </View>
-            )}
-        </GlassCard>
+            </GlassCard>
+        </TouchableOpacity>
     );
 
     return (

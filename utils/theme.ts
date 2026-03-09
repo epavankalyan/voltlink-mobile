@@ -16,7 +16,6 @@ export const COLORS = {
   secondaryBlue: '#10a6de',
   gradientStart: '#04eaaa',
   gradientEnd: '#10a6de',
-  v2gPurple: '#8b5cf6',
 
   // Status
   successGreen: '#04eaaa',

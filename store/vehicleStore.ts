@@ -97,7 +97,7 @@ export const useVehicleStore = create<VehicleState>()(
             fetchFamilyVehicles: async (userId?: string) => {
                 try {
                     const id = userId || DEFAULT_USER_ID;
-                    const res = await apiClient.get(`/b2c/users/${id}/family`);
+                    const res = await apiClient.get(`/users/${id}/family`);
                     const data = res.data || [];
                     set({
                         familyVehicles: data.map((m: any) => ({
@@ -115,7 +115,7 @@ export const useVehicleStore = create<VehicleState>()(
             addFamilyMemberApi: async (data) => {
                 try {
                     const id = DEFAULT_USER_ID;
-                    await apiClient.post(`/b2c/users/${id}/family`, data);
+                    await apiClient.post(`/users/${id}/family`, data);
                     await get().fetchFamilyVehicles(id);
                 } catch (error) {
                     console.error('Error adding family member:', error);
@@ -125,7 +125,7 @@ export const useVehicleStore = create<VehicleState>()(
             removeFamilyMemberApi: async (memberId) => {
                 try {
                     const id = DEFAULT_USER_ID;
-                    await apiClient.delete(`/b2c/users/${id}/family/${memberId}`);
+                    await apiClient.delete(`/users/${id}/family/${memberId}`);
                     await get().fetchFamilyVehicles(id);
                 } catch (error) {
                     console.error('Error removing family member:', error);

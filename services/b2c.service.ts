@@ -5,13 +5,13 @@ const DEFAULT_LAT = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LAT ?? '12.9716')
 const DEFAULT_LNG = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LNG ?? '77.5946');
 
 export const getB2CStats = async (userId: string = DEFAULT_USER_ID) =>
-    apiClient.get(`/b2c/users/${userId}/profile`).then(res => ({
+    apiClient.get(`/users/${userId}/profile`).then(res => ({
         ...res.data,
         availableCredits: res.data.credit_account?.current_balance,
     }));
 
 export const getCreditTransactions = async (userId: string = DEFAULT_USER_ID) =>
-    apiClient.get(`/b2c/users/${userId}/credits`).then(res => {
+    apiClient.get(`/users/${userId}/credits`).then(res => {
         const transactions = res.data.transactions || [];
         return transactions.map((t: any) => ({
             id: t.id.toString(),
@@ -24,11 +24,11 @@ export const getCreditTransactions = async (userId: string = DEFAULT_USER_ID) =>
 
 export const getB2CRecommendations = async () =>
     apiClient
-        .get('/b2c/live-rates', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG } })
+        .get('/live-rates', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG } })
         .then(res => res.data);
 
 export const getSustainabilityStats = async (userId: string = DEFAULT_USER_ID) =>
-    apiClient.get(`/b2c/users/${userId}/sustainability`).then(res => ({
+    apiClient.get(`/users/${userId}/sustainability`).then(res => ({
         greenScore: res.data.green_score,
         carbonSavedKg: res.data.carbon_saved_kg,
         renewablePercent: res.data.renewable_percent,
@@ -37,7 +37,7 @@ export const getSustainabilityStats = async (userId: string = DEFAULT_USER_ID) =
 
 export const getUserSessions = async (userId: string = DEFAULT_USER_ID, status?: string) =>
     apiClient
-        .get(`/b2c/users/${userId}/session`, { params: { status } })
+        .get(`/users/${userId}/sessions`, { params: { status } })
         .then(res => res.data);
 
 export const getUserBookings = async (userId: string = DEFAULT_USER_ID, status?: string) =>

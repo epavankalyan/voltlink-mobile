@@ -124,11 +124,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
                                 <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.carbonSavedKg || 0}kg</Text>
                                 <Text style={[styles.sustainLabel, { color: textSecondary }]}>CO2 Saved</Text>
                             </GlassCard>
-                            <GlassCard style={styles.sustainItem} intensity={10}>
-                                <Zap size={20} color={COLORS.v2gPurple} />
-                                <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.renewablePercent || 0}%</Text>
-                                <Text style={[styles.sustainLabel, { color: textSecondary }]}>Renewable</Text>
-                            </GlassCard>
+
                             <GlassCard style={styles.sustainItem} intensity={10}>
                                 <Trophy size={20} color={COLORS.warningOrange} />
                                 <Text style={[styles.sustainValue, { color: textPrimary }]}>#{sustainability?.carbonRank || '--'}</Text>
