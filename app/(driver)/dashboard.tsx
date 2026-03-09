@@ -58,13 +58,13 @@ const DriverDashboard = () => {
 
     const { currentVehicleId, setCurrentVehicleId } = useVehicleStore();
 
-    const fetchData = async () => {
+    const fetchData = async (forceRefresh: boolean = false) => {
         try {
-            const profile = await getDriverProfile();
+            const profile = await getDriverProfile(undefined, forceRefresh);
             setDriverProfile(profile);
 
             // Always prioritize the driver's first assigned vehicle from the backend
-            const driverVehicles = await getVehiclesByDriver();
+            const driverVehicles = await getVehiclesByDriver(undefined, forceRefresh);
             const vehicleId = driverVehicles?.[0]?.id;
 
             if (vehicleId) setCurrentVehicleId(vehicleId);
@@ -72,9 +72,9 @@ const DriverDashboard = () => {
             if (!vehicleId) return;
 
             const [vData, sData, rData] = await Promise.all([
-                getVehicleDashboard(vehicleId),
-                getTodayStats(vehicleId),
-                getAIRecommendations(vehicleId)
+                getVehicleDashboard(vehicleId, forceRefresh),
+                getTodayStats(vehicleId, forceRefresh),
+                getAIRecommendations(vehicleId, forceRefresh)
             ]);
             setVehicle(vData);
             setStats(sData);
@@ -88,7 +88,7 @@ const DriverDashboard = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchData();
+        await fetchData(true);
         setRefreshing(false);
     };
 

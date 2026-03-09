@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,14 +43,14 @@ export default function HistoryScreen() {
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
 
-    const fetchData = async () => {
+    const fetchData = async (forceRefresh: boolean = false) => {
         setLoading(true);
         try {
             if (activeTab === 'Active') {
                 // Fetch both pending bookings and active sessions
                 const [bookingsResponse, sessions] = await Promise.all([
-                    getBookings({ status: 'pending' }),
-                    getUserSessions(undefined, 'active')
+                    getBookings({ status: 'pending' }, forceRefresh),
+                    getUserSessions(undefined, 'active', forceRefresh)
                 ]);
 
                 const bookings = bookingsResponse.data || [];
@@ -75,7 +75,7 @@ export default function HistoryScreen() {
                 ];
                 setItems(mappedItems);
             } else {
-                const sessions = await getUserSessions(undefined, 'completed');
+                const sessions = await getUserSessions(undefined, 'completed', forceRefresh);
                 const mappedItems: HistoryItem[] = sessions.map((s: any) => ({
                     id: s.id,
                     date: format(new Date(s.start_time), 'dd MMM yyyy'),
@@ -100,6 +100,25 @@ export default function HistoryScreen() {
     }, [activeTab]);
 
     const handleCancelBooking = (id: string) => {
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm('Cancelling within 15 minutes of the slot incurs a ₹20 penalty. Do you want to proceed?');
+            if (confirmed) {
+                (async () => {
+                    try {
+                        setLoading(true);
+                        await cancelBooking(id, { reason: 'Cancelled by user' });
+                        window.alert('Your booking has been cancelled and a ₹20 penalty has been applied.');
+                        fetchData(true);
+                    } catch (error) {
+                        console.error('Cancel booking error:', error);
+                        window.alert('Failed to cancel the booking.');
+                        setLoading(false);
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert(
             'Cancel Booking?',
             'Cancelling within 15 minutes of the slot incurs a ₹20 penalty. Do you want to proceed?',
@@ -111,9 +130,9 @@ export default function HistoryScreen() {
                     onPress: async () => {
                         try {
                             setLoading(true);
-                            await cancelBooking(id, { reason: 'User requested' });
+                            await cancelBooking(id, { reason: 'Cancelled by user' });
                             Alert.alert('Cancelled', 'Your booking has been cancelled and a ₹20 penalty has been applied.');
-                            fetchData();
+                            fetchData(true);
                         } catch (error) {
                             console.error('Cancel booking error:', error);
                             Alert.alert('Error', 'Failed to cancel the booking.');
@@ -129,45 +148,54 @@ export default function HistoryScreen() {
         if (activeTab === 'Active') {
             const isActive = item.status === 'active';
             return (
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => router.push({
-                        pathname: '/(b2c)/session',
-                        params: { sessionId: item.id }
-                    })}
-                >
-                    <GlassCard style={styles.bookingCard as any} intensity={25}>
-                        <View style={styles.cardHeader}>
-                            <View style={[styles.iconBox, { backgroundColor: isActive ? COLORS.successGreen + '20' : COLORS.brandBlue + '20' }]}>
-                                {isActive ? <Zap size={18} color={COLORS.successGreen} /> : <Calendar size={18} color={COLORS.brandBlue} />}
-                            </View>
-                            <View style={styles.headerInfo}>
-                                <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
-                                <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
-                            </View>
-                            {!isActive && (
-                                <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
-                                    <XCircle size={22} color={COLORS.alertRed} />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        <View style={styles.bookingDetails}>
-                            <View style={styles.detailRow}>
-                                <Zap size={14} color={isActive ? COLORS.successGreen : COLORS.brandBlue} />
-                                <Text style={[styles.detailText, { color: textSecondary }]}>
-                                    {item.type} {item.cost ? `· ₹${item.cost}` : ''} {item.kWh ? `· ${item.kWh} kWh` : ''}
-                                </Text>
-                            </View>
-                        </View>
+                <View style={{ marginBottom: SPACING.md }}>
+                    <GlassCard style={{ ...(styles.bookingCard as any), padding: 0 }} intensity={25}>
 
                         {!isActive && (
-                            <TouchableOpacity style={styles.navigateBtn}>
-                                <Text style={styles.navigateText}>View Directions →</Text>
+                            <TouchableOpacity
+                                onPress={() => handleCancelBooking(item.id)}
+                                style={{ position: 'absolute', right: SPACING.lg, top: SPACING.lg, zIndex: 10 }}
+                            >
+                                <XCircle size={22} color={COLORS.alertRed} />
                             </TouchableOpacity>
                         )}
+
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => router.push({
+                                pathname: '/(b2c)/session',
+                                params: { sessionId: item.id }
+                            })}
+                            style={{ padding: SPACING.lg }}
+                        >
+                            <View style={styles.cardHeader}>
+                                <View style={[styles.iconBox, { backgroundColor: isActive ? COLORS.successGreen + '20' : COLORS.brandBlue + '20' }]}>
+                                    {isActive ? <Zap size={18} color={COLORS.successGreen} /> : <Calendar size={18} color={COLORS.brandBlue} />}
+                                </View>
+                                <View style={styles.headerInfo}>
+                                    <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
+                                    <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
+                                </View>
+                                {!isActive && <View style={{ width: 22 }} />}
+                            </View>
+
+                            <View style={styles.bookingDetails}>
+                                <View style={styles.detailRow}>
+                                    <Zap size={14} color={isActive ? COLORS.successGreen : COLORS.brandBlue} />
+                                    <Text style={[styles.detailText, { color: textSecondary }]}>
+                                        {item.type} {item.cost ? `· ₹${item.cost}` : ''} {item.kWh ? `· ${item.kWh} kWh` : ''}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {!isActive && (
+                                <View style={styles.navigateBtn}>
+                                    <Text style={styles.navigateText}>View Directions →</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     </GlassCard>
-                </TouchableOpacity>
+                </View>
             );
         }
 
@@ -242,7 +270,7 @@ export default function HistoryScreen() {
                     data={items}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
-                    onRefresh={fetchData}
+                    onRefresh={() => fetchData(true)}
                     refreshing={loading}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}

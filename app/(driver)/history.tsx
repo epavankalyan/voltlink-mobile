@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator, Alert
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,14 +48,14 @@ export default function DriverHistory() {
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
 
-    const fetchSessions = async () => {
+    const fetchSessions = async (forceRefresh: boolean = false) => {
         setLoading(true);
         try {
             const status = filter === 'all' ? undefined : filter;
 
             const [data, bookingsResponse] = await Promise.all([
-                getDriverSessions(undefined, currentVehicleId || '', status as any),
-                (filter === 'all' || filter === 'active') ? getBookings({ status: 'pending' }) : Promise.resolve({ data: [] })
+                getDriverSessions(undefined, currentVehicleId || '', status as any, forceRefresh),
+                (filter === 'all' || filter === 'active') ? getBookings({ status: 'pending' }, forceRefresh) : Promise.resolve({ data: [] })
             ]);
 
             const bookings = bookingsResponse.data || [];
@@ -110,6 +110,25 @@ export default function DriverHistory() {
     }, [filter]);
 
     const handleCancelBooking = (id: string) => {
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm('Cancelling within 15 minutes of the slot incurs a ₹20 penalty. Do you want to proceed?');
+            if (confirmed) {
+                (async () => {
+                    try {
+                        setLoading(true);
+                        await cancelBooking(id, { reason: 'Cancelled by user' });
+                        window.alert('Your booking has been cancelled and a ₹20 penalty has been applied.');
+                        fetchSessions(true);
+                    } catch (error) {
+                        console.error('Cancel booking error:', error);
+                        window.alert('Failed to cancel the booking.');
+                        setLoading(false);
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert(
             'Cancel Booking?',
             'Cancelling within 15 minutes of the slot incurs a ₹20 penalty. Do you want to proceed?',
@@ -121,9 +140,9 @@ export default function DriverHistory() {
                     onPress: async () => {
                         try {
                             setLoading(true);
-                            await cancelBooking(id, { reason: 'User requested' });
+                            await cancelBooking(id, { reason: 'Cancelled by user' });
                             Alert.alert('Cancelled', 'Your booking has been cancelled and a ₹20 penalty has been applied.');
-                            fetchSessions();
+                            fetchSessions(true);
                         } catch (error) {
                             console.error('Cancel booking error:', error);
                             Alert.alert('Error', 'Failed to cancel the booking.');
@@ -140,62 +159,74 @@ export default function DriverHistory() {
     const totalCarbon = sessions.reduce((s, i) => s + (i.carbonSaved || 0), 0);
 
     const renderSession = ({ item }: { item: SessionItem }) => (
-        <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push({
-                pathname: '/(driver)/session',
-                params: { sessionId: item.id }
-            })}
-        >
-            <GlassCard style={styles.sessionCard as any} intensity={20}>
-                <View style={styles.sessionHeader}>
-                    <View style={styles.sessionInfo}>
-                        <Text style={[styles.sessionStation, { color: textPrimary }]}>{item.stationName}</Text>
-                        <View style={styles.sessionMeta}>
-                            <MapPin size={12} color={textSecondary} />
-                            <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.connectorType}</Text>
-                            <Clock size={12} color={textSecondary} />
-                            <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
-                        </View>
-                    </View>
-                    {item.status === 'pending' ? (
-                        <TouchableOpacity onPress={() => handleCancelBooking(item.id)}>
-                            <Text style={{ color: COLORS.alertRed, ...TYPOGRAPHY.label }}>Cancel</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
-                    )}
-                </View>
+        <View style={{ marginBottom: SPACING.sm }}>
+            <GlassCard style={{ ...(styles.sessionCard as any), padding: 0 }} intensity={20}>
 
-                <View style={styles.sessionStats}>
-                    <View style={styles.sessionStat}>
-                        <Zap size={14} color={COLORS.brandBlue} />
-                        <Text style={[styles.sessionStatValue, { color: textPrimary }]}>{item.kwh} kWh</Text>
-                    </View>
-                    <View style={styles.sessionStat}>
-                        <Text style={[styles.sessionStatValue, { color: COLORS.successGreen }]}>₹{item.cost.toFixed(0)}</Text>
-                    </View>
-                    {item.carbonSaved > 0 && (
-                        <View style={styles.sessionStat}>
-                            <Text style={[styles.sessionStatValue, { color: textSecondary }]}>🌱 {item.carbonSaved.toFixed(1)} kg</Text>
-                        </View>
-                    )}
-                </View>
-
-                {item.rating > 0 && (
-                    <View style={styles.ratingRow}>
-                        {[1, 2, 3, 4, 5].map(n => (
-                            <Star
-                                key={n}
-                                size={14}
-                                color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
-                                fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
-                            />
-                        ))}
-                    </View>
+                {/* Cancel Button Absolute */}
+                {item.status === 'pending' && (
+                    <TouchableOpacity
+                        onPress={() => handleCancelBooking(item.id)}
+                        style={{ position: 'absolute', right: SPACING.md, top: SPACING.md, zIndex: 10, padding: 4 }}
+                    >
+                        <Text style={{ color: COLORS.alertRed, ...TYPOGRAPHY.label }}>Cancel</Text>
+                    </TouchableOpacity>
                 )}
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => router.push({
+                        pathname: '/(driver)/session',
+                        params: { sessionId: item.id }
+                    })}
+                    style={{ padding: SPACING.md }}
+                >
+                    <View style={styles.sessionHeader}>
+                        <View style={styles.sessionInfo}>
+                            <Text style={[styles.sessionStation, { color: textPrimary }]}>{item.stationName}</Text>
+                            <View style={styles.sessionMeta}>
+                                <MapPin size={12} color={textSecondary} />
+                                <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.connectorType}</Text>
+                                <Clock size={12} color={textSecondary} />
+                                <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
+                            </View>
+                        </View>
+                        {item.status === 'pending' ? (
+                            <View style={{ width: 45 }} />
+                        ) : (
+                            <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
+                        )}
+                    </View>
+
+                    <View style={styles.sessionStats}>
+                        <View style={styles.sessionStat}>
+                            <Zap size={14} color={COLORS.brandBlue} />
+                            <Text style={[styles.sessionStatValue, { color: textPrimary }]}>{item.kwh} kWh</Text>
+                        </View>
+                        <View style={styles.sessionStat}>
+                            <Text style={[styles.sessionStatValue, { color: COLORS.successGreen }]}>₹{item.cost.toFixed(0)}</Text>
+                        </View>
+                        {item.carbonSaved > 0 && (
+                            <View style={styles.sessionStat}>
+                                <Text style={[styles.sessionStatValue, { color: textSecondary }]}>🌱 {item.carbonSaved.toFixed(1)} kg</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {item.rating > 0 && (
+                        <View style={styles.ratingRow}>
+                            {[1, 2, 3, 4, 5].map(n => (
+                                <Star
+                                    key={n}
+                                    size={14}
+                                    color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
+                                    fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
+                                />
+                            ))}
+                        </View>
+                    )}
+                </TouchableOpacity>
             </GlassCard>
-        </TouchableOpacity>
+        </View>
     );
 
     return (

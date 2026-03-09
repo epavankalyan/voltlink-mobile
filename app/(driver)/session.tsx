@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator
+    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -8,7 +8,7 @@ import Animated, {
     useSharedValue, withTiming, useAnimatedProps, withRepeat, withSequence
 } from 'react-native-reanimated';
 import { Zap, AlertTriangle, Star } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
@@ -68,11 +68,13 @@ export default function SessionScreen() {
         }
     }, [session]);
 
-    useEffect(() => {
-        fetchSession();
-        const timer = setInterval(fetchSession, POLL_INTERVAL);
-        return () => clearInterval(timer);
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchSession();
+            const timer = setInterval(fetchSession, POLL_INTERVAL);
+            return () => clearInterval(timer);
+        }, [fetchSession])
+    );
 
     const animProps = useAnimatedProps(() => ({
         strokeDashoffset: CIRCUMFERENCE * (1 - progress.value),
@@ -109,12 +111,34 @@ export default function SessionScreen() {
         : Math.max(0, Math.round((100 - chargePercent) * 2.8));
 
     const handleStop = () => {
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm('Are you sure you want to end this charging session?');
+            if (confirmed) {
+                (async () => {
+                    try {
+                        if (session?.id) {
+                            const finalSession = await stopSession(session.id);
+                            setSession(finalSession);
+                        }
+                        setSessionEnded(true);
+                    } catch (error) {
+                        console.error('Error stopping session:', error);
+                        window.alert('Failed to stop session.');
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert('Stop Charging?', 'Are you sure you want to end this charging session?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Stop Session', style: 'destructive', onPress: async () => {
                     try {
-                        if (session?.id) await stopSession(session.id);
+                        if (session?.id) {
+                            const finalSession = await stopSession(session.id);
+                            setSession(finalSession);
+                        }
                         setSessionEnded(true);
                     } catch (error) {
                         console.error('Error stopping session:', error);

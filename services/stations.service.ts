@@ -1,4 +1,4 @@
-import { apiClient } from './api.service';
+import { apiClient, fetchWithCache } from './api.service';
 import { Station } from '../types/station.types';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -16,9 +16,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const USER_LAT = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LAT ?? '12.9716');
 const USER_LNG = parseFloat(process.env.EXPO_PUBLIC_DEFAULT_LNG ?? '77.5946');
 
-export const getStations = async (params?: any): Promise<Station[]> =>
-    apiClient.get('/charging-stations', { params }).then(res => {
-        const stations = res.data.data || [];
+export const getStations = async (params?: any, forceRefresh?: boolean): Promise<Station[]> =>
+    fetchWithCache('/charging-stations', { params, forceRefresh }).then(data => {
+        const stations = data.data || [];
         return stations.map((s: any) => {
             const dist = s.latitude && s.longitude
                 ? calculateDistance(USER_LAT, USER_LNG, s.latitude, s.longitude)
@@ -38,9 +38,9 @@ export const getStations = async (params?: any): Promise<Station[]> =>
         });
     });
 
-export const getStationById = async (id: string): Promise<Station> =>
-    apiClient.get(`/charging-stations/${id}`).then(res => {
-        const d = res.data;
+export const getStationById = async (id: string, forceRefresh?: boolean): Promise<Station> =>
+    fetchWithCache(`/charging-stations/${id}`, { forceRefresh }).then(data => {
+        const d = data;
         const dist = d.latitude && d.longitude
             ? calculateDistance(USER_LAT, USER_LNG, d.latitude, d.longitude)
             : 5.2;
@@ -56,11 +56,12 @@ export const getStationById = async (id: string): Promise<Station> =>
     });
 
 export const getAIRecommendations = async (
-    vehicleId: string
+    vehicleId: string,
+    forceRefresh?: boolean
 ): Promise<Station[]> =>
-    apiClient.get(`/vehicles/${vehicleId}/recommendations`).then(res => {
-        const data = res.data || [];
-        return data.map((s: any) => {
+    fetchWithCache(`/vehicles/${vehicleId}/recommendations`, { forceRefresh }).then(data => {
+        const d = data || [];
+        return d.map((s: any) => {
             const lat = s.evse?.latitude || s.latitude || USER_LAT;
             const lng = s.evse?.longitude || s.longitude || USER_LNG;
             const dist = calculateDistance(USER_LAT, USER_LNG, lat, lng);

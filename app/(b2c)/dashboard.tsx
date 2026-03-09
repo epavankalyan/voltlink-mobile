@@ -13,6 +13,8 @@ import { useVehicleStore } from '../../store/vehicleStore';
 import { useRouter } from 'expo-router';
 import { useLanguageStore, Language } from '../../store/languageStore';
 
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
+
 const translations = {
     English: {
         welcome: 'Welcome back,',
@@ -63,9 +65,9 @@ const B2CDashboard = () => {
     const [showAddVehicle, setShowAddVehicle] = useState(false);
     const [newVehicle, setNewVehicle] = useState({ memberName: '', vehicleModel: '', batteryLevel: 80 });
 
-    const fetchData = async () => {
+    const fetchData = async (forceRefresh: boolean = false) => {
         try {
-            const sData = await getB2CStats();
+            const sData = await getB2CStats(DEFAULT_USER_ID, forceRefresh);
             setStats(sData);
 
             // Set current vehicle ID from profile if available
@@ -83,7 +85,7 @@ const B2CDashboard = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchData();
+        await fetchData(true);
         setRefreshing(false);
     };
 

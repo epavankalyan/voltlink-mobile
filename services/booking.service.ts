@@ -1,4 +1,4 @@
-import { apiClient } from './api.service';
+import { apiClient, fetchWithCache } from './api.service';
 import {
     Booking,
     PaginatedResponse,
@@ -12,8 +12,8 @@ export const getBookings = async (params?: {
     status?: string;
     page?: number;
     page_size?: number;
-}): Promise<PaginatedResponse<Booking>> => {
-    return apiClient.get('/bookings', { params }).then(res => res.data);
+}, forceRefresh?: boolean): Promise<PaginatedResponse<Booking>> => {
+    return fetchWithCache('/bookings', { params, forceRefresh });
 };
 
 export const createBooking = async (
@@ -22,8 +22,8 @@ export const createBooking = async (
     return apiClient.post('/bookings', data).then(res => res.data);
 };
 
-export const getBookingById = async (id: string): Promise<Booking> => {
-    return apiClient.get(`/bookings/${id}`).then(res => res.data);
+export const getBookingById = async (id: string, forceRefresh?: boolean): Promise<Booking> => {
+    return fetchWithCache(`/bookings/${id}`, { forceRefresh });
 };
 
 export const updateBooking = async (

@@ -1,20 +1,20 @@
-import { apiClient } from './api.service';
+import { apiClient, fetchWithCache } from './api.service';
 
 const DEFAULT_FLEET_ID = process.env.EXPO_PUBLIC_DEFAULT_FLEET_ID ?? '1';
 const DEFAULT_DRIVER_ID = process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4';
 
-export const getDriverProfile = async (driverId: string = DEFAULT_DRIVER_ID) =>
-    apiClient.get(`/users/${driverId}`).then(res => res.data?.data || res.data);
+export const getDriverProfile = async (driverId: string = DEFAULT_DRIVER_ID, forceRefresh?: boolean) =>
+    fetchWithCache(`/users/${driverId}`, { forceRefresh }).then(data => data?.data || data);
 
-export const getVehiclesByDriver = async (driverId: string = DEFAULT_DRIVER_ID) =>
-    apiClient.get(`/users/${driverId}`).then(res => {
-        const data = res.data?.data || res.data;
-        return data?.vehicles || [];
+export const getVehiclesByDriver = async (driverId: string = DEFAULT_DRIVER_ID, forceRefresh?: boolean) =>
+    fetchWithCache(`/users/${driverId}`, { forceRefresh }).then(data => {
+        const d = data?.data || data;
+        return d?.vehicles || [];
     });
 
-export const getVehicleDashboard = async (vehicleId: string) =>
-    apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
-        const d = res.data.data || res.data;
+export const getVehicleDashboard = async (vehicleId: string, forceRefresh?: boolean) =>
+    fetchWithCache(`/vehicles/${vehicleId}/extended`, { forceRefresh }).then(data => {
+        const d = data.data || data;
         return {
             id: d.id,
             name: d.name || '',
@@ -30,9 +30,9 @@ export const getVehicleDashboard = async (vehicleId: string) =>
         };
     });
 
-export const getTodayStats = async (vehicleId: string) =>
-    apiClient.get(`/vehicles/${vehicleId}/extended`).then(res => {
-        const d = res.data.data || res.data;
+export const getTodayStats = async (vehicleId: string, forceRefresh?: boolean) =>
+    fetchWithCache(`/vehicles/${vehicleId}/extended`, { forceRefresh }).then(data => {
+        const d = data.data || data;
         return {
             distanceKm: 0,
             kwhConsumed: Math.round(
@@ -46,12 +46,11 @@ export const getDriverSessions = async (
     fleetId: string = DEFAULT_FLEET_ID,
     vehicleId: string,
     status?: string,
+    forceRefresh?: boolean
 ) =>
-    apiClient
-        .get(`/fleets/${fleetId}/sessions`, {
-            params: { vehicle_id: vehicleId, status },
-        })
-        .then(res => res.data?.data || []);
+    fetchWithCache(`/fleets/${fleetId}/sessions`, {
+        params: { vehicle_id: vehicleId, status }, forceRefresh
+    }).then(data => data?.data || []);
 
-export const getNotifications = async (fleetId: string = DEFAULT_FLEET_ID) =>
-    apiClient.get(`/fleets/${fleetId}/alerts`).then(res => res.data);
+export const getNotifications = async (fleetId: string = DEFAULT_FLEET_ID, forceRefresh?: boolean) =>
+    fetchWithCache(`/fleets/${fleetId}/alerts`, { forceRefresh });

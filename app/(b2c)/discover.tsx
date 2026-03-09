@@ -72,11 +72,19 @@ export default function DiscoverScreen() {
     const [showReport, setShowReport] = useState(false);
     const sheetRef = useRef<BottomSheet>(null);
 
-    useEffect(() => {
-        Promise.all([getStations(), fetchFamilyVehicles()])
+    const fetchData = async (forceRefresh: boolean = false) => {
+        Promise.all([getStations(undefined, forceRefresh), fetchFamilyVehicles()])
             .then(([s]) => setStations(s))
             .catch(console.error);
+    };
+
+    useEffect(() => {
+        fetchData();
     }, []);
+
+    const onRefresh = () => {
+        fetchData(true);
+    };
 
     const surfaceBg = isDark ? '#1C1C1E' : '#FFFFFF';
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
@@ -253,6 +261,8 @@ export default function DiscoverScreen() {
                     renderItem={renderStation}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    onRefresh={onRefresh}
+                    refreshing={false}
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Zap size={36} color={COLORS.textMutedDark} />

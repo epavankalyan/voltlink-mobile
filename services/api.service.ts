@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,35 @@ apiClient.interceptors.response.use(
             AsyncStorage.removeItem('auth_token');
         }
 
-        console.error(`[API] ${method} ${url} → ${status ?? 'NETWORK ERROR'}`, error.message);
         return Promise.reject(error);
     }
 );
+
+// ---------------------------------------------------------------------------
+// Caching Layer
+// ---------------------------------------------------------------------------
+interface CacheEntry {
+    data: any;
+    timestamp: number;
+}
+
+const reqCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export const fetchWithCache = async (url: string, config?: AxiosRequestConfig & { forceRefresh?: boolean }) => {
+    const { forceRefresh, ...axiosConfig } = config || {};
+    const cacheKey = `${url}?${new URLSearchParams(axiosConfig.params || {}).toString()}`;
+
+    if (!forceRefresh) {
+        const cached = reqCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+            return cached.data;
+        }
+    }
+
+    const response = await apiClient.get(url, axiosConfig);
+    reqCache.set(cacheKey, { data: response.data, timestamp: Date.now() });
+
+    return response.data;
+};
+
