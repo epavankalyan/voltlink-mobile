@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
     StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, Star, Calendar, XCircle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -98,6 +98,12 @@ export default function HistoryScreen() {
     useEffect(() => {
         fetchData();
     }, [activeTab]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchData(true);
+        }, [activeTab])
+    );
 
     const handleCancelBooking = (id: string) => {
         if (Platform.OS === 'web') {

@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, Zap, Clock, CheckCircle } from 'lucide-react-native';
+import {
+    ArrowLeft, MapPin, Zap, Clock, CheckCircle,
+    Car, BatteryCharging, Plug, IndianRupee, CalendarCheck, Bot
+} from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
@@ -21,7 +25,8 @@ export default function B2CBooking() {
     const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
-    const params = useLocalSearchParams<{ stationId?: string }>();
+    const params = useLocalSearchParams<{ stationId?: string, isAI?: string }>();
+    const isAI = params.isAI === 'true';
 
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [confirmed, setConfirmed] = useState(false);
@@ -29,6 +34,33 @@ export default function B2CBooking() {
     const [station, setStation] = useState<any>(null);
     const [connectorSlots, setConnectorSlots] = useState<ConnectorSlots[]>([]);
     const [selectedConnectorId, setSelectedConnectorId] = useState<string>('');
+    const [taskStep, setTaskStep] = useState(0); // 0 to 7 (0 means not started)
+    const [submitting, setSubmitting] = useState(false);
+    const scrollRef = useRef<ScrollView>(null);
+
+    useEffect(() => {
+        if (confirmed) {
+            // Initial jump to top
+            setTimeout(() => {
+                scrollRef.current?.scrollTo({ y: 0, animated: false });
+            }, 50);
+        }
+    }, [confirmed]);
+
+    useEffect(() => {
+        if (confirmed && taskStep > 0 && scrollRef.current) {
+            // Auto-follow: Scroll to keep the active step visible
+            // Roughly 100px for header + 80px per step
+            let stepY = Math.max(0, (taskStep - 2) * 85);
+
+            // If we reached the final step, scroll just enough to clear the bottom menu nicely
+            if (taskStep === 7) {
+                stepY += 260;
+            }
+
+            scrollRef.current.scrollTo({ y: stepY, animated: true });
+        }
+    }, [taskStep, confirmed]);
 
     const scale = useSharedValue(1);
     const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -48,8 +80,15 @@ export default function B2CBooking() {
                 ]);
                 setStation(stationData);
                 setConnectorSlots(slotsData);
+
                 if (slotsData.length > 0) {
-                    setSelectedConnectorId(slotsData[0].connector_id);
+                    const firstConnector = slotsData[0];
+                    setSelectedConnectorId(firstConnector.connector_id);
+
+                    // If AI mode, auto-select first slot and proceed
+                    if (isAI && firstConnector.slots.length > 0) {
+                        setSelectedSlot('0-0'); // Use same ID pattern as displaySlots
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching booking data:', error);
@@ -59,7 +98,14 @@ export default function B2CBooking() {
             }
         };
         fetchData();
-    }, [params.stationId]);
+    }, [params.stationId, isAI]);
+
+    // Auto-confirm if isAI and data is ready
+    useEffect(() => {
+        if (isAI && !loading && !confirmed && !submitting && selectedSlot && station) {
+            handleConfirm();
+        }
+    }, [isAI, loading, confirmed, submitting, selectedSlot, station]);
 
     const connector = connectorSlots[0];
     const displaySlots = connector?.slots.map((s, i) => ({ ...s, id: `0-${i}` })) || [];
@@ -71,10 +117,12 @@ export default function B2CBooking() {
     const creditsEarned = Math.round(estimatedCost * 0.12);
 
     const handleConfirm = async () => {
-        if (!selectedSlot) {
-            Alert.alert('Select a Slot', 'Please choose an available time slot first.');
+        if (!selectedSlot || submitting) {
+            if (!selectedSlot) Alert.alert('Select a Slot', 'Please choose an available time slot first.');
             return;
         }
+
+        setSubmitting(true);
         scale.value = withSpring(0.95, {}, () => { scale.value = withSpring(1); });
 
         try {
@@ -101,38 +149,169 @@ export default function B2CBooking() {
                 user_id: DEFAULT_USER_ID,
                 booking_time: now.toISOString(),
             });
+
             setConfirmed(true);
-            setTimeout(() => {
-                router.replace('/(b2c)/history');
-            }, 1800);
-        } catch (error) {
-            console.error('Error creating session:', error);
-            Alert.alert('Error', 'Failed to start session. Please try again.');
+            setTaskStep(1); // Set first step immediately
+
+            // Start the task loop animation for remaining steps
+            let step = 2;
+            const interval = setInterval(() => {
+                setTaskStep(step);
+                if (step === 7) {
+                    clearInterval(interval);
+                    // No auto-navigation now, user will click "Go to Session"
+                }
+                step++;
+            }, 1000); // 1s per step for better visibility
+            setSubmitting(false); // Reset in case of future use, though we switch views
+        } catch (error: any) {
+            setSubmitting(false);
+            console.error('Booking confirmation fatal error:', error);
+            Alert.alert('Error', error.message || 'Something went wrong while confirming your booking.');
         }
     };
 
-    if (loading) {
+    // Auto-redirect manual bookings to history
+    useEffect(() => {
+        if (confirmed && !isAI) {
+            const timer = setTimeout(() => {
+                router.replace('/(b2c)/history');
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [confirmed, isAI]);
+
+    if (loading && !confirmed) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={COLORS.brandBlue} />
+            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]} edges={['top']}>
+                <ActivityIndicator color={COLORS.brandBlue} size="large" />
+                {isAI && (
+                    <Text style={[styles.loadingText, { color: textSecondary, marginTop: 20 }]}>
+                        🤖 AI is finding the best slot for you...
+                    </Text>
+                )}
             </SafeAreaView>
         );
     }
 
-    if (confirmed) {
+    if (confirmed && !isAI) {
+        // Simple success view for manual bookings
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
+            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]} edges={['top']}>
                 <CheckCircle size={80} color={COLORS.successGreen} />
-                <Text style={[styles.confirmedTitle, { color: textPrimary }]}>Booking Confirmed!</Text>
-                <Text style={[styles.confirmedSub, { color: textSecondary }]}>
-                    Starting your session…
+                <Text style={[styles.successTitle, { color: textPrimary, marginTop: 20 }]}>Booking Confirmed!</Text>
+                <Text style={[styles.successSub, { color: textSecondary, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }]}>
+                    Redirecting to your history screen...
                 </Text>
             </SafeAreaView>
         );
     }
 
+    if (confirmed) {
+        const steps = [
+            { title: 'Vehicle Detected', sub: 'Reading vehicle telemetry', detail: 'Battery: 35% · Capacity: 72 kWh · Location acquired', Icon: Car },
+            { title: 'Battery Analyzed', sub: 'Determining charge type', detail: 'Battery < 50% → AC Fast charging recommended', Icon: BatteryCharging },
+            { title: 'Route Scanned', sub: 'Finding CPOs within 5 km', detail: '3 CPOs found on Bangalore → Chennai route', Icon: MapPin },
+            { title: 'Charger Matched', sub: 'Checking slot availability', detail: 'AC Fast @ ChargeZone Hub — slot in 30 min', Icon: Plug },
+            { title: 'Price Calculated', sub: 'Applying dynamic pricing', detail: '₹8.00/kWh · Off-peak discount applied (−20%)', Icon: IndianRupee },
+            { title: 'Slot Booked', sub: 'Reservation confirmed', detail: 'Booked 14:30–15:30 · Est. cost ₹259.20', Icon: CalendarCheck },
+            { title: 'Charging Active', sub: 'Session in progress', detail: 'Charging to 80% · ETA 47 min remaining', Icon: Zap },
+        ];
+
+        return (
+            <SafeAreaView key="task-loop" style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
+                <View style={styles.loopHeader}>
+                    <GlassCard style={styles.botBadge as any} intensity={15}>
+                        <Bot size={16} color={COLORS.brandBlue} />
+                        <Text style={[styles.botText, { color: textPrimary }]}>VoltLink AI Optimizer</Text>
+                    </GlassCard>
+                    <Text style={[styles.loopTitle, { color: textPrimary }]}>Processing your booking...</Text>
+                </View>
+
+                <ScrollView
+                    ref={scrollRef}
+                    contentContainerStyle={[styles.loopContent, { paddingBottom: 200 }]}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.timelineContainer}>
+                        {steps.map((s, i) => {
+                            const stepIdx = i + 1;
+                            const isActive = taskStep === stepIdx;
+                            const isCompleted = taskStep > stepIdx;
+                            const isLast = i === steps.length - 1;
+                            const statusColor = isCompleted ? COLORS.successGreen : isActive ? COLORS.brandBlue : textSecondary;
+
+                            return (
+                                <View key={i} style={styles.stepRow}>
+                                    {/* Icon Column with segments */}
+                                    <View style={styles.iconCol}>
+                                        {!isLast && (
+                                            <View style={[
+                                                styles.timelineSegment,
+                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+                                            ]} />
+                                        )}
+                                        {!isLast && isCompleted && (
+                                            <View style={[styles.timelineSegmentProgress, { backgroundColor: COLORS.successGreen }]} />
+                                        )}
+
+                                        <View style={[
+                                            styles.stepCircle,
+                                            { borderColor: statusColor, backgroundColor: bg },
+                                            isActive && styles.activeCircle
+                                        ]}>
+                                            <s.Icon size={20} color={statusColor} />
+                                        </View>
+                                    </View>
+
+                                    {/* Content Column */}
+                                    <View style={styles.stepMain}>
+                                        <View style={styles.stepHeaderRow}>
+                                            <Text style={[styles.stepTitle, { color: isCompleted || isActive ? textPrimary : textSecondary }]}>
+                                                {s.title}
+                                            </Text>
+                                            {isCompleted && <CheckCircle size={16} color={COLORS.successGreen} style={{ marginLeft: 8 }} />}
+                                        </View>
+                                        <Text style={[styles.stepSub, { color: textSecondary }]}>{s.sub}</Text>
+
+                                        {(isActive || isCompleted) && (
+                                            <GlassCard style={styles.detailBadge as any} intensity={isActive ? 20 : 10}>
+                                                <Text style={[styles.detailText, { color: textSecondary }]}>{s.detail}</Text>
+                                            </GlassCard>
+                                        )}
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
+
+                    {taskStep === 7 && (
+                        <View style={[styles.successBox, { backgroundColor: isDark ? 'rgba(0,255,136,0.08)' : 'rgba(0,255,136,0.05)' }]}>
+                            <CheckCircle color={COLORS.successGreen} size={32} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.successTitle, { color: textPrimary }]}>Success!</Text>
+                                <Text style={[styles.successSub, { color: textSecondary }]}>
+                                    Your booking at {station?.name} is confirmed and AI has initiated the session.
+                                </Text>
+
+                                {/* Go to Session Button INSIDE the box */}
+                                <TouchableOpacity
+                                    style={styles.innerSessionBtn}
+                                    onPress={() => router.replace('/(b2c)/session')}
+                                >
+                                    <Text style={styles.innerSessionText}>Go to Session</Text>
+                                    <ArrowLeft size={16} color={COLORS.brandBlue} style={{ transform: [{ rotate: '180deg' }] }} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
+        <SafeAreaView key="booking-form" style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <ArrowLeft size={24} color={textPrimary} />
@@ -229,19 +408,22 @@ export default function B2CBooking() {
                 {/* Confirm Button */}
                 <Animated.View style={animStyle}>
                     <TouchableOpacity
-                        style={[
-                            styles.confirmBtn,
-                            { backgroundColor: selectedSlot ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }
-                        ]}
                         onPress={handleConfirm}
-                        activeOpacity={0.85}
+                        disabled={!selectedSlot || submitting}
+                        activeOpacity={0.8}
                     >
-                        <Text style={[
-                            styles.confirmText,
-                            { color: selectedSlot ? '#000' : COLORS.textMutedDark }
-                        ]}>
-                            Confirm Booking
-                        </Text>
+                        <LinearGradient
+                            colors={!selectedSlot || submitting ? ['#444', '#333'] : [COLORS.brandBlue, '#00A3FF']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.confirmBtn}
+                        >
+                            {submitting ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <Text style={styles.confirmText}>Confirm Booking</Text>
+                            )}
+                        </LinearGradient>
                     </TouchableOpacity>
                 </Animated.View>
             </ScrollView>
@@ -276,6 +458,61 @@ const styles = StyleSheet.create({
         opacity: 0.4, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'transparent',
     },
     slotTime: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 14 },
+    successBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.lg,
+        borderRadius: BORDER_RADIUS.lg,
+        gap: SPACING.md,
+        marginTop: SPACING.xl,
+    },
+    successTitle: {
+        ...TYPOGRAPHY.sectionHeader,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    successSub: {
+        ...TYPOGRAPHY.label,
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 4,
+    },
+    goToSessionBtn: {
+        marginTop: SPACING.xl,
+        borderRadius: BORDER_RADIUS.xl,
+        overflow: 'hidden',
+    },
+    sessionBtnGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        gap: 10,
+    },
+    sessionBtnText: {
+        ...TYPOGRAPHY.body,
+        fontWeight: '800',
+        fontSize: 16,
+        color: '#000',
+    },
+    loadingText: {
+        ...TYPOGRAPHY.body,
+        textAlign: 'center',
+        fontWeight: '600',
+    },
+    innerSessionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 12,
+        paddingVertical: 4,
+    },
+    innerSessionText: {
+        ...TYPOGRAPHY.label,
+        color: COLORS.brandBlue,
+        fontWeight: '800',
+        fontSize: 14,
+    },
     slotPrice: { ...TYPOGRAPHY.label, marginTop: 4 },
     estimateCard: {
         padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, marginBottom: SPACING.lg,
@@ -298,6 +535,54 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     confirmText: { ...TYPOGRAPHY.body, fontSize: 16, fontWeight: '700' },
-    confirmedTitle: { ...TYPOGRAPHY.hero, fontSize: 28, marginTop: SPACING.xl, textAlign: 'center' },
-    confirmedSub: { ...TYPOGRAPHY.body, marginTop: SPACING.sm, textAlign: 'center' },
+
+    // Task Loop Styles
+    loopHeader: { paddingTop: SPACING.lg, paddingBottom: SPACING.sm, alignItems: 'center' },
+    botBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 12, paddingVertical: 4,
+        borderRadius: 20, marginBottom: SPACING.sm,
+    },
+    botText: { ...TYPOGRAPHY.label, fontWeight: '800', fontSize: 11 },
+    loopTitle: { ...TYPOGRAPHY.hero, fontSize: 22, textAlign: 'center' },
+    loopContent: { paddingHorizontal: SPACING.xl, paddingTop: SPACING.lg, paddingBottom: 200 },
+    timelineContainer: { marginTop: SPACING.md },
+    timelineSegment: {
+        position: 'absolute', left: 21, top: 40, bottom: -24,
+        width: 2, borderRadius: 1, zIndex: 1,
+    },
+    timelineSegmentProgress: {
+        position: 'absolute', left: 21, top: 40, bottom: -24,
+        width: 2, borderRadius: 1, zIndex: 2,
+    },
+    stepRow: { flexDirection: 'row', marginBottom: 24, minHeight: 60 },
+    iconCol: { width: 44, alignItems: 'center', zIndex: 10 },
+    stepCircle: {
+        width: 44, height: 44, borderRadius: 22,
+        justifyContent: 'center', alignItems: 'center',
+        borderWidth: 2, zIndex: 10,
+    },
+    activeCircle: {
+        shadowColor: COLORS.brandBlue,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8, shadowRadius: 10,
+        elevation: 10,
+    },
+    stepMain: { flex: 1, paddingLeft: SPACING.md, paddingTop: 6 },
+    stepHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+    stepTitle: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 16 },
+    stepSub: { ...TYPOGRAPHY.label, fontSize: 12, marginTop: 2, opacity: 0.8 },
+    detailBadge: {
+        marginTop: 8, paddingHorizontal: 10, paddingVertical: 6,
+        borderRadius: 8, alignSelf: 'flex-start',
+    },
+    detailText: { ...TYPOGRAPHY.label, fontSize: 11, fontStyle: 'italic' },
+    completionSummary: {
+        backgroundColor: 'rgba(52, 199, 89, 0.08)',
+        borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
+        alignItems: 'center', marginTop: SPACING.md,
+        borderWidth: 1, borderColor: 'rgba(52, 199, 89, 0.2)',
+    },
+    summaryTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 18, marginTop: 8 },
+    summarySub: { ...TYPOGRAPHY.label, marginTop: 4 },
 });

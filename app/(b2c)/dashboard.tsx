@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, ScrollView, RefreshControl, Text, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Wallet, Leaf, Zap, ChevronRight, Map, Plus, X } from 'lucide-react-native';
+import { Wallet, Leaf, Zap, ChevronRight, Map, Plus, X, MapPin, Bot } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { MetricCard } from '../../components/ui/MetricCard';
 import { VehicleCard } from '../../components/vehicle/VehicleCard';
 import { GlassButton } from '../../components/ui/GlassButton';
 import { getB2CStats } from '../../services/b2c.service';
+import { getStations } from '../../services/stations.service';
+import { Station } from '../../types/station.types';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { useRouter } from 'expo-router';
@@ -31,7 +33,11 @@ const translations = {
         vehicleModel: 'Vehicle Model (e.g. Nexon EV)',
         batteryLevel: 'Current Battery %',
         cancel: 'Cancel',
-        addVehicle: 'Add Vehicle'
+        addVehicle: 'Add Vehicle',
+        aiRec: 'AI RECOMMENDATIONS',
+        bookNow: 'Book Now',
+        available: 'Available',
+        full: 'Full',
     },
     'हिंदी': {
         welcome: 'वापसी पर स्वागत है,',
@@ -48,7 +54,11 @@ const translations = {
         vehicleModel: 'वाहन मॉडल (जैसे नेक्सॉन ईवी)',
         batteryLevel: 'वर्तमान बैटरी %',
         cancel: 'रद्द करें',
-        addVehicle: 'वाहन जोड़ें'
+        addVehicle: 'वाहन जोड़ें',
+        aiRec: 'AI सुझाव',
+        bookNow: 'अभी बुक करें',
+        available: 'उपलब्ध',
+        full: 'भरा हुआ',
     }
 };
 
@@ -62,13 +72,25 @@ const B2CDashboard = () => {
 
     const [refreshing, setRefreshing] = useState(false);
     const [stats, setStats] = useState<any>(null);
+    const [aiStations, setAiStations] = useState<Station[]>([]);
     const [showAddVehicle, setShowAddVehicle] = useState(false);
     const [newVehicle, setNewVehicle] = useState({ memberName: '', vehicleModel: '', batteryLevel: 80 });
 
     const fetchData = async (forceRefresh: boolean = false) => {
         try {
-            const sData = await getB2CStats(DEFAULT_USER_ID, forceRefresh);
+            const [sData, stationsData] = await Promise.all([
+                getB2CStats(DEFAULT_USER_ID, forceRefresh),
+                getStations(undefined, forceRefresh),
+            ]);
             setStats(sData);
+
+            // Sort: stations with aiReason first, then by distance
+            const sorted = [...stationsData].sort((a, b) => {
+                if (a.aiReason && !b.aiReason) return -1;
+                if (!a.aiReason && b.aiReason) return 1;
+                return (a.distanceKm ?? 99) - (b.distanceKm ?? 99);
+            });
+            setAiStations(sorted.slice(0, 3));
 
             // Set current vehicle ID from profile if available
             const vehicleId = sData?.user?.primary_vehicle_id || sData?.vehicles?.[0]?.id;
@@ -215,6 +237,99 @@ const B2CDashboard = () => {
                     </GlassCard>
                 </TouchableOpacity>
 
+                {/* AI Recommendations Section */}
+                {aiStations.length > 0 && (
+                    <View style={styles.aiSection}>
+                        <View style={styles.sectionHeaderRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Bot size={14} color={COLORS.brandBlue} />
+                                <Text style={[styles.familyTitle, { color: textSecondary }]}>{t.aiRec}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => router.push('/(b2c)/discover' as any)}>
+                                <Text style={[styles.seeAllText, { color: COLORS.brandBlue }]}>See all</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.aiScroll}
+                        >
+                            {aiStations.map((station) => {
+                                const ok = (station.availableChargers ?? 0) > 0;
+                                const dot = ok ? COLORS.successGreen : COLORS.alertRed;
+                                return (
+                                    <TouchableOpacity
+                                        key={station.id}
+                                        activeOpacity={0.85}
+                                        onPress={() => router.push({
+                                            pathname: '/(b2c)/booking',
+                                            params: { stationId: station.id, isAI: 'true' }
+                                        } as any)}
+                                    >
+                                        <GlassCard style={styles.aiCard as any} intensity={20}>
+                                            {/* Status dot + name */}
+                                            <View style={styles.aiCardTop}>
+                                                <View style={[styles.aiDotOuter, { backgroundColor: `${dot}20` }]}>
+                                                    <View style={[styles.aiDotInner, { backgroundColor: dot }]} />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={[styles.aiStationName, { color: textPrimary }]} numberOfLines={1}>
+                                                        {station.name}
+                                                    </Text>
+                                                    <Text style={[styles.aiCpoName, { color: COLORS.brandBlue }]} numberOfLines={1}>
+                                                        {station.cpoName}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Price */}
+                                            <Text style={styles.aiPrice}>
+                                                ₹{station.effectivePrice || station.pricePerKwh}
+                                                <Text style={[styles.aiPriceUnit, { color: textSecondary }]}>/kWh</Text>
+                                            </Text>
+
+                                            {/* Meta chips */}
+                                            <View style={styles.aiMeta}>
+                                                <View style={[styles.aiChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                                                    <MapPin size={10} color={textSecondary} />
+                                                    <Text style={[styles.aiChipText, { color: textSecondary }]}>{station.distanceKm} km</Text>
+                                                </View>
+                                                <View style={[styles.aiChip, { backgroundColor: `${dot}15` }]}>
+                                                    <Zap size={10} color={dot} />
+                                                    <Text style={[styles.aiChipText, { color: dot, fontWeight: '700' }]}>
+                                                        {station.availableChargers}/{station.totalChargers} {ok ? t.available : t.full}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* AI reason badge */}
+                                            {station.aiReason && (
+                                                <View style={styles.aiReasonBadge}>
+                                                    <Text style={styles.aiReasonText} numberOfLines={2}>🤖 {station.aiReason}</Text>
+                                                </View>
+                                            )}
+
+                                            {/* Book Now */}
+                                            <TouchableOpacity
+                                                style={[styles.aiBookBtn, !ok && { opacity: 0.4 }]}
+                                                onPress={() => router.push({
+                                                    pathname: '/(b2c)/booking',
+                                                    params: { stationId: station.id, isAI: 'true' }
+                                                } as any)}
+                                                disabled={!ok}
+                                            >
+                                                <Text style={styles.aiBookText}>{ok ? t.bookNow : t.full}</Text>
+                                                {ok && <ChevronRight size={13} color={COLORS.brandBlue} />}
+                                            </TouchableOpacity>
+                                        </GlassCard>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
+
                 {/* Find Stations CTA */}
                 <TouchableOpacity
                     style={styles.discoverCta}
@@ -338,6 +453,34 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, gap: SPACING.sm,
     },
     discoverText: { ...TYPOGRAPHY.body, color: COLORS.brandBlue, flex: 1, fontWeight: '600' },
+    seeAllText: { ...TYPOGRAPHY.label, fontWeight: '700', fontSize: 12 },
+
+    // AI Recommendations
+    aiSection: { marginBottom: SPACING.md },
+    aiScroll: { gap: SPACING.sm, paddingBottom: SPACING.sm },
+    aiCard: {
+        width: 200,
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.lg,
+    },
+    aiCardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xs ?? 4, gap: 8 },
+    aiDotOuter: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+    aiDotInner: { width: 9, height: 9, borderRadius: 4.5 },
+    aiStationName: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 13 },
+    aiCpoName: { ...TYPOGRAPHY.label, fontWeight: '600', fontSize: 10, marginTop: 1 },
+    aiPrice: { ...TYPOGRAPHY.sectionHeader, fontSize: 18, fontWeight: '800', color: COLORS.successGreen, marginBottom: 6 },
+    aiPriceUnit: { fontSize: 11, fontWeight: '400' },
+    aiMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 6 },
+    aiChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+    aiChipText: { ...TYPOGRAPHY.label, fontSize: 10 },
+    aiReasonBadge: { backgroundColor: 'rgba(0,212,255,0.08)', borderRadius: 7, padding: 5, marginBottom: 8 },
+    aiReasonText: { ...TYPOGRAPHY.label, color: COLORS.brandBlue, fontSize: 10, lineHeight: 14 },
+    aiBookBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 3, paddingVertical: 7,
+        borderTopWidth: 1, borderTopColor: 'rgba(0,212,255,0.15)',
+    },
+    aiBookText: { ...TYPOGRAPHY.label, fontWeight: '800', fontSize: 12, color: COLORS.brandBlue },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: SPACING.lg },
     modalContent: { padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl },
