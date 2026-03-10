@@ -24,9 +24,7 @@ export default function MapComponent({
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [isLeafletReady, setIsLeafletReady] = useState(false);
 
-    const baseMapUrl = isDark
-        ? "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
-        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+    const baseMapUrl = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&scale=2";
 
     // Generate the HTML for the iframe
     const htmlContent = `
@@ -67,6 +65,10 @@ export default function MapComponent({
                 animation: pulse 2s infinite;
             }
 
+            .google-maps-dark {
+                filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+            }
+
             .station-icon {
                 background-color: ${COLORS?.successGreen || '#4ADE80'};
             }
@@ -93,7 +95,9 @@ export default function MapComponent({
             });
 
             L.tileLayer('${baseMapUrl}', {
-                maxZoom: 19
+                maxZoom: 19,
+                detectRetina: true,
+                className: ${isDark ? "'google-maps-dark'" : "''"}
             }).addTo(map);
 
             var markers = [];
