@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Clock, Star, Calendar, XCircle } from 'lucide-react-native';
+import { Zap, Clock, ThumbsUp, ThumbsDown, Calendar, XCircle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
@@ -232,9 +232,15 @@ export default function HistoryScreen() {
                                     <Text style={[styles.gridValue, { color: textPrimary }]}>{item.duration}</Text>
                                 </View>
                                 <View style={styles.gridItem}>
-                                    <Star size={12} color={COLORS.warningOrange} />
                                     <Text style={[styles.gridLabel, { color: textSecondary }]}>Rating</Text>
-                                    <Text style={[styles.gridValue, { color: textPrimary }]}>{'★'.repeat(item.rating || 0)}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        {item.rating && item.rating >= 4 ? (
+                                            <ThumbsUp size={14} color={COLORS.successGreen} fill={COLORS.successGreen} />
+                                        ) : (
+                                            <ThumbsDown size={14} color={COLORS.alertRed} fill={COLORS.alertRed} />
+                                        )}
+                                        <Text style={[styles.gridValue, { color: textPrimary }]}>{item.rating && item.rating >= 4 ? 'Good' : 'Bad'}</Text>
+                                    </View>
                                 </View>
                             </View>
                             <TouchableOpacity style={styles.invoiceBtn}>

@@ -7,7 +7,7 @@ import Svg, { Circle } from 'react-native-svg';
 import Animated, {
     useSharedValue, withTiming, useAnimatedProps, withRepeat, withSequence
 } from 'react-native-reanimated';
-import { Zap, AlertTriangle, Star } from 'lucide-react-native';
+import { Zap, AlertTriangle, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -22,7 +22,7 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
-const POLL_INTERVAL = 5000; // 5 seconds
+const POLL_INTERVAL = Number(process.env.EXPO_PUBLIC_SESSION_POLL_INTERVAL ?? 30000); // Default to 30 seconds
 
 export default function SessionScreen() {
     const { theme } = useThemeStore();
@@ -33,7 +33,8 @@ export default function SessionScreen() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [sessionEnded, setSessionEnded] = useState(false);
-    const [rating, setRating] = useState(0);
+    const [stationRating, setStationRating] = useState(0);
+    const [appRating, setAppRating] = useState(0);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
     const progress = useSharedValue(0);
@@ -177,24 +178,39 @@ export default function SessionScreen() {
                             <Text style={[styles.ratingKwh, { color: textSecondary }]}>{kwhDelivered} kWh delivered</Text>
 
                             <Text style={[styles.ratingPrompt, { color: textSecondary }]}>Rate your charging experience</Text>
-                            <View style={styles.starsRow}>
-                                {[1, 2, 3, 4, 5].map(n => (
-                                    <TouchableOpacity key={n} onPress={() => setRating(n)}>
-                                        <Star
-                                            size={36}
-                                            color={n <= rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}
-                                            fill={n <= rating ? COLORS.warningOrange : 'transparent'}
-                                        />
-                                    </TouchableOpacity>
-                                ))}
+
+                            <View style={styles.ratingSection}>
+                                <View style={styles.ratingRowCategory}>
+                                    <Text style={[styles.categoryLabel, { color: textSecondary }]}>Station</Text>
+                                    <View style={styles.thumbsRow}>
+                                        <TouchableOpacity onPress={() => setStationRating(1)} style={[styles.thumbBtn, stationRating === 1 && { borderColor: COLORS.alertRed, backgroundColor: COLORS.alertRed + '15' }]}>
+                                            <ThumbsDown size={24} color={stationRating === 1 ? COLORS.alertRed : textSecondary} fill={stationRating === 1 ? COLORS.alertRed : 'transparent'} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => setStationRating(5)} style={[styles.thumbBtn, stationRating === 5 && { borderColor: COLORS.successGreen, backgroundColor: COLORS.successGreen + '15' }]}>
+                                            <ThumbsUp size={24} color={stationRating === 5 ? COLORS.successGreen : textSecondary} fill={stationRating === 5 ? COLORS.successGreen : 'transparent'} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={styles.ratingRowCategory}>
+                                    <Text style={[styles.categoryLabel, { color: textSecondary }]}>App</Text>
+                                    <View style={styles.thumbsRow}>
+                                        <TouchableOpacity onPress={() => setAppRating(1)} style={[styles.thumbBtn, appRating === 1 && { borderColor: COLORS.alertRed, backgroundColor: COLORS.alertRed + '15' }]}>
+                                            <ThumbsDown size={24} color={appRating === 1 ? COLORS.alertRed : textSecondary} fill={appRating === 1 ? COLORS.alertRed : 'transparent'} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => setAppRating(5)} style={[styles.thumbBtn, appRating === 5 && { borderColor: COLORS.successGreen, backgroundColor: COLORS.successGreen + '15' }]}>
+                                            <ThumbsUp size={24} color={appRating === 5 ? COLORS.successGreen : textSecondary} fill={appRating === 5 ? COLORS.successGreen : 'transparent'} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             </View>
 
                             <TouchableOpacity
-                                style={[styles.submitBtn, { backgroundColor: rating > 0 ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }]}
+                                style={[styles.submitBtn, { backgroundColor: (stationRating > 0 && appRating > 0) ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }]}
                                 onPress={handleRatingSubmit}
                             >
-                                <Text style={{ color: rating > 0 ? '#000' : COLORS.textMutedDark, fontWeight: '700' }}>
-                                    {rating > 0 ? 'Submit Rating' : 'Skip'}
+                                <Text style={{ color: (stationRating > 0 && appRating > 0) ? '#000' : COLORS.textMutedDark, fontWeight: '700' }}>
+                                    {(stationRating > 0 && appRating > 0) ? 'Submit Feedback' : 'Skip'}
                                 </Text>
                             </TouchableOpacity>
                         </GlassCard>
@@ -352,8 +368,12 @@ const styles = StyleSheet.create({
     ratingTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 22, marginTop: SPACING.md },
     ratingCost: { ...TYPOGRAPHY.hero, fontSize: 32, fontWeight: '800', marginTop: SPACING.sm },
     ratingKwh: { ...TYPOGRAPHY.body, marginTop: SPACING.xs },
-    ratingPrompt: { ...TYPOGRAPHY.body, marginTop: SPACING.xl, marginBottom: SPACING.md },
-    starsRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.xl },
+    ratingPrompt: { ...TYPOGRAPHY.body, marginTop: SPACING.lg, marginBottom: SPACING.md },
+    ratingSection: { width: '100%', gap: SPACING.md, marginBottom: SPACING.xl },
+    ratingRowCategory: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+    categoryLabel: { ...TYPOGRAPHY.label, fontWeight: '600', fontSize: 13 },
+    thumbsRow: { flexDirection: 'row', gap: SPACING.lg },
+    thumbBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
     submitBtn: {
         width: '100%', height: 50, borderRadius: BORDER_RADIUS.xl,
         justifyContent: 'center', alignItems: 'center',

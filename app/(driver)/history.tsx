@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Clock, MapPin, Star } from 'lucide-react-native';
+import { Zap, Clock, MapPin, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { SectionHeader } from '../../components/ui/SectionHeader';
@@ -214,14 +214,14 @@ export default function DriverHistory() {
 
                     {item.rating > 0 && (
                         <View style={styles.ratingRow}>
-                            {[1, 2, 3, 4, 5].map(n => (
-                                <Star
-                                    key={n}
-                                    size={14}
-                                    color={n <= item.rating ? COLORS.warningOrange : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
-                                    fill={n <= item.rating ? COLORS.warningOrange : 'transparent'}
-                                />
-                            ))}
+                            {item.rating >= 4 ? (
+                                <ThumbsUp size={14} color={COLORS.successGreen} fill={COLORS.successGreen} />
+                            ) : (
+                                <ThumbsDown size={14} color={COLORS.alertRed} fill={COLORS.alertRed} />
+                            )}
+                            <Text style={[styles.sessionMetaText, { color: item.rating >= 4 ? COLORS.successGreen : COLORS.alertRed, marginLeft: 4 }]}>
+                                {item.rating >= 4 ? 'Good' : 'Bad'}
+                            </Text>
                         </View>
                     )}
                 </TouchableOpacity>

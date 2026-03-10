@@ -50,9 +50,9 @@ export default function RecommendationsScreen() {
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
 
-    const handleRating = (rating: number, comment: string) => {
+    const handleRating = (stationRating: number, appRating: number, comment: string) => {
         setShowRating(false);
-        Alert.alert('Thank You', `Your rating for ${selectedStation?.name} has been submitted.`);
+        Alert.alert('Thank You', 'Your feedback has been submitted.');
     };
 
     const handleReport = (type: string, desc: string) => {

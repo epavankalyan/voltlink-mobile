@@ -9,7 +9,7 @@ import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 import { Search, MapPin, Zap, Clock, ChevronRight, Star, AlertCircle, Car, Menu, SlidersHorizontal, User } from 'lucide-react-native';
 import MapComponent from '../../components/map/MapComponent';
-import FilterModal, { FilterState } from '../../components/filters/FilterModal';
+import { FilterContent, FilterState } from '../../components/filters/FilterContent';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import RatingModal from '../../components/feedback/RatingModal';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
@@ -235,10 +235,13 @@ export default function DiscoverScreen() {
                         autoFocus={false}
                     />
                     <TouchableOpacity
-                        style={[styles.iconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', marginRight: SPACING.xs }]}
-                        onPress={() => setShowFilters(true)}
+                        style={[styles.iconBtn, { backgroundColor: showFilters ? COLORS.brandBlue + '20' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'), marginRight: SPACING.xs, borderColor: showFilters ? COLORS.brandBlue : 'transparent', borderWidth: showFilters ? 1 : 0 }]}
+                        onPress={() => {
+                            setShowFilters(!showFilters);
+                            if (!showFilters) sheetRef.current?.snapToIndex(2); // Expand when opening filters
+                        }}
                     >
-                        <SlidersHorizontal size={18} color={textPrimary} />
+                        <SlidersHorizontal size={18} color={showFilters ? COLORS.brandBlue : textPrimary} />
                     </TouchableOpacity>
 
                 </View>
@@ -254,28 +257,42 @@ export default function DiscoverScreen() {
                 backgroundStyle={[styles.sheetBg, { backgroundColor: surfaceBg }]}
                 handleIndicatorStyle={styles.indicator}
             >
-                {/* Scrollable station list */}
-                <BottomSheetFlatList
-                    data={filtered}
-                    keyExtractor={(s: Station) => s.id}
-                    renderItem={renderStation}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                    onRefresh={onRefresh}
-                    refreshing={false}
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Zap size={36} color={COLORS.textMutedDark} />
-                            <Text style={[styles.emptyText, { color: textSecondary }]}>{t.noMatch}</Text>
-                        </View>
-                    }
-                />
+                {showFilters ? (
+                    <FilterContent
+                        currentFilters={activeFilters}
+                        stations={stations}
+                        onClose={() => setShowFilters(false)}
+                        onApply={(opts) => {
+                            setActiveFilters(opts);
+                            setShowFilters(false);
+                        }}
+                    />
+                ) : (
+                    <BottomSheetFlatList
+                        data={filtered}
+                        keyExtractor={(s: Station) => s.id}
+                        renderItem={renderStation}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                        onRefresh={onRefresh}
+                        refreshing={false}
+                        ListEmptyComponent={
+                            <View style={styles.empty}>
+                                <Zap size={36} color={COLORS.textMutedDark} />
+                                <Text style={[styles.emptyText, { color: textSecondary }]}>{t.noMatch}</Text>
+                            </View>
+                        }
+                    />
+                )}
             </BottomSheet>
 
             <RatingModal
                 visible={showRating}
                 onClose={() => setShowRating(false)}
-                onSubmit={() => { setShowRating(false); Alert.alert('Thanks!', `Rated ${selectedStation?.name}`); }}
+                onSubmit={(sRating, aRating) => {
+                    setShowRating(false);
+                    Alert.alert('Thanks!', 'Your feedback has been received.');
+                }}
                 stationName={selectedStation?.name || ''}
             />
             <ReportIssueModal
@@ -283,18 +300,6 @@ export default function DiscoverScreen() {
                 onClose={() => setShowReport(false)}
                 onSubmit={() => { setShowReport(false); Alert.alert('Reported', 'Team notified.'); }}
                 stationName={selectedStation?.name || ''}
-            />
-
-            <FilterModal
-                visible={showFilters}
-                onClose={() => setShowFilters(false)}
-                currentFilters={activeFilters}
-                onApply={(opts) => {
-                    setActiveFilters(opts);
-                    setShowFilters(false);
-                }}
-                stations={stations}
-                myVehicle={undefined}
             />
         </View>
     );
