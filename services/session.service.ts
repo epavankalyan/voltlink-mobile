@@ -59,6 +59,19 @@ export const stopSession = async (sessionId: string) =>
 // Active session polling
 // ---------------------------------------------------------------------------
 
+export interface SessionRatingRequest {
+    comment: string;
+    rating: number;
+    session_id: string;
+    user_id: number;
+}
+
+/**
+ * Submit feedback for a charging session.
+ */
+export const rateSession = async (stationId: string, data: SessionRatingRequest) =>
+    apiClient.post(`/charging-stations/${stationId}/ratings`, data).then(res => res.data);
+
 /**
  * Get the currently active session for a vehicle (or 404 if none).
  */

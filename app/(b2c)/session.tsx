@@ -12,7 +12,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getUserActiveSessions, stopSession } from '../../services/session.service';
+import { getUserActiveSessions, stopSession, rateSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -150,9 +150,26 @@ export default function B2CSession() {
         ]);
     };
 
-    const handleRatingSubmit = () => {
-        setRatingSubmitted(true);
-        setTimeout(() => router.replace('/(b2c)/dashboard'), 1500);
+    const handleRatingSubmit = async () => {
+        try {
+            if (session?.id && (stationRating > 0 || appRating > 0)) {
+                // Determine rating: 5 for Thumbs Up, 1 for Thumbs Down
+                const finalRating = stationRating || appRating;
+
+                await rateSession(session.station_id || 'unknown', {
+                    session_id: session.id.toString(),
+                    user_id: parseInt(DEFAULT_USER_ID),
+                    rating: finalRating,
+                    comment: `Station: ${stationRating === 5 ? 'Up' : 'Down'}, App: ${appRating === 5 ? 'Up' : 'Down'}`,
+                });
+            }
+            setRatingSubmitted(true);
+            setTimeout(() => router.replace('/(b2c)/dashboard'), 1500);
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            Alert.alert('Error', 'Failed to submit feedback. Taking you to dashboard.');
+            router.replace('/(b2c)/dashboard');
+        }
     };
 
     if (loading) {

@@ -12,6 +12,7 @@ import MapComponent from '../../components/map/MapComponent';
 import { FilterContent, FilterState } from '../../components/filters/FilterContent';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import RatingModal from '../../components/feedback/RatingModal';
+import { rateSession } from '../../services/session.service';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
@@ -289,9 +290,23 @@ export default function DiscoverScreen() {
             <RatingModal
                 visible={showRating}
                 onClose={() => setShowRating(false)}
-                onSubmit={(sRating, aRating) => {
-                    setShowRating(false);
-                    Alert.alert('Thanks!', 'Your feedback has been received.');
+                onSubmit={async (sRating, aRating, comment) => {
+                    try {
+                        if (selectedStation?.id) {
+                            await rateSession(selectedStation.id.toString(), {
+                                session_id: "0", // No session context in discovery, using placeholder
+                                user_id: 11, // Default user
+                                rating: sRating || aRating,
+                                comment: comment || `Discovery Rating: App ${aRating}, Station ${sRating}`,
+                            });
+                        }
+                        setShowRating(false);
+                        Alert.alert('Thanks!', 'Your feedback has been received.');
+                    } catch (error) {
+                        console.error('Error submitting rating:', error);
+                        setShowRating(false);
+                        Alert.alert('Error', 'Failed to submit feedback.');
+                    }
                 }}
                 stationName={selectedStation?.name || ''}
             />

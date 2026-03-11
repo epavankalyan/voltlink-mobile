@@ -12,7 +12,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getVehicleActiveSession, stopSession } from '../../services/session.service';
+import { getVehicleActiveSession, stopSession, rateSession } from '../../services/session.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -150,9 +150,27 @@ export default function SessionScreen() {
         ]);
     };
 
-    const handleRatingSubmit = () => {
-        setRatingSubmitted(true);
-        setTimeout(() => router.replace('/(driver)/dashboard'), 1500);
+    const handleRatingSubmit = async () => {
+        try {
+            if (session?.id && (stationRating > 0 || appRating > 0)) {
+                // Determine rating: 5 for Thumbs Up, 1 for Thumbs Down
+                // If both are provided, we prioritize station rating for now as per requirement
+                const finalRating = stationRating || appRating;
+
+                await rateSession(session.station_id || 'unknown', {
+                    session_id: session.id.toString(),
+                    user_id: parseInt(DEFAULT_USER_ID),
+                    rating: finalRating,
+                    comment: `Station: ${stationRating === 5 ? 'Up' : 'Down'}, App: ${appRating === 5 ? 'Up' : 'Down'}`, // Placeholder for combined feedback
+                });
+            }
+            setRatingSubmitted(true);
+            setTimeout(() => router.replace('/(driver)/dashboard'), 1500);
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            Alert.alert('Error', 'Failed to submit feedback. Taking you to dashboard.');
+            router.replace('/(driver)/dashboard');
+        }
     };
 
     if (loading) {

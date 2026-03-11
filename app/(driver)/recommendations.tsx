@@ -11,6 +11,7 @@ import { Station } from '../../types/station.types'; // Added
 import { useVehicleStore } from '../../store/vehicleStore';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import RatingModal from '../../components/feedback/RatingModal';
+import { rateSession } from '../../services/session.service';
 import ReportIssueModal from '../../components/feedback/ReportIssueModal';
 import { Alert } from 'react-native';
 
@@ -50,9 +51,23 @@ export default function RecommendationsScreen() {
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
 
-    const handleRating = (stationRating: number, appRating: number, comment: string) => {
-        setShowRating(false);
-        Alert.alert('Thank You', 'Your feedback has been submitted.');
+    const handleRating = async (sRating: number, aRating: number, comment: string) => {
+        try {
+            if (selectedStation?.id) {
+                await rateSession(selectedStation.id.toString(), {
+                    session_id: "0",
+                    user_id: 11, // Default user
+                    rating: sRating || aRating,
+                    comment: comment || `AI Recommendation Rating: App ${aRating}, Station ${sRating}`,
+                });
+            }
+            setShowRating(false);
+            Alert.alert('Thank You', 'Your feedback has been submitted.');
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            setShowRating(false);
+            Alert.alert('Error', 'Failed to submit feedback.');
+        }
     };
 
     const handleReport = (type: string, desc: string) => {
