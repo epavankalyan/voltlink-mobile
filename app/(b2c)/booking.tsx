@@ -159,7 +159,10 @@ export default function B2CBooking() {
                 setTaskStep(step);
                 if (step === 7) {
                     clearInterval(interval);
-                    // No auto-navigation now, user will click "Go to Session"
+                    // Auto-navigate to history after a short delay
+                    setTimeout(() => {
+                        router.replace('/(b2c)/history');
+                    }, 2000);
                 }
                 step++;
             }, 1000); // 1s per step for better visibility
@@ -294,14 +297,9 @@ export default function B2CBooking() {
                                     Your booking at {station?.name} is confirmed and AI has initiated the session.
                                 </Text>
 
-                                {/* Go to Session Button INSIDE the box */}
-                                <TouchableOpacity
-                                    style={styles.innerSessionBtn}
-                                    onPress={() => router.replace('/(b2c)/session')}
-                                >
-                                    <Text style={styles.innerSessionText}>Go to Session</Text>
-                                    <ArrowLeft size={16} color={COLORS.brandBlue} style={{ transform: [{ rotate: '180deg' }] }} />
-                                </TouchableOpacity>
+                                <Text style={[styles.successSub, { color: textSecondary, marginTop: 12, fontStyle: 'italic' }]}>
+                                    Redirecting you to the history screen...
+                                </Text>
                             </View>
                         </View>
                     )}

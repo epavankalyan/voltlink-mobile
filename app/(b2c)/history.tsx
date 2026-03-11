@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform, Linking, Modal
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Clock, ThumbsUp, ThumbsDown, Calendar, XCircle } from 'lucide-react-native';
+import { Zap, Clock, ThumbsUp, ThumbsDown, Calendar, XCircle, MapPin, CheckCircle, Info } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
@@ -37,6 +37,8 @@ export default function HistoryScreen() {
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [items, setItems] = useState<HistoryItem[]>([]);
+    const [verifyingStation, setVerifyingStation] = useState<string | null>(null);
+    const [showWorkingModal, setShowWorkingModal] = useState(false);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
@@ -150,6 +152,32 @@ export default function HistoryScreen() {
         );
     };
 
+    const openDirections = () => {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=12.9716,77.5946`;
+        Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+    };
+
+    const handleOpenSession = (sessionId: string) => {
+        setVerifyingStation(sessionId);
+        setShowWorkingModal(true);
+    };
+
+    const confirmStationWorking = (isWorking: boolean) => {
+        setShowWorkingModal(false);
+        if (isWorking) {
+            router.push({
+                pathname: '/(b2c)/session',
+                params: { sessionId: verifyingStation! }
+            });
+        } else {
+            Alert.alert(
+                "Station Issue",
+                "We're sorry the station is not working. Redirecting you to Home to find another recommendation.",
+                [{ text: "OK", onPress: () => router.replace('/(b2c)/dashboard') }]
+            );
+        }
+    };
+
     const renderItem = ({ item }: { item: HistoryItem }) => {
         if (activeTab === 'Active') {
             const isActive = item.status === 'active';
@@ -182,7 +210,6 @@ export default function HistoryScreen() {
                                     <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
                                     <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
                                 </View>
-                                {!isActive && <View style={{ width: 22 }} />}
                             </View>
 
                             <View style={styles.bookingDetails}>
@@ -195,8 +222,22 @@ export default function HistoryScreen() {
                             </View>
 
                             {!isActive && (
-                                <View style={styles.navigateBtn}>
-                                    <Text style={styles.navigateText}>View Directions →</Text>
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { borderColor: COLORS.brandBlue }]}
+                                        onPress={openDirections}
+                                    >
+                                        <MapPin size={14} color={COLORS.brandBlue} />
+                                        <Text style={[styles.actionBtnText, { color: COLORS.brandBlue }]}>View Directions</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: COLORS.brandBlue, borderColor: COLORS.brandBlue }]}
+                                        onPress={() => handleOpenSession(item.id)}
+                                    >
+                                        <Zap size={14} color="#000" />
+                                        <Text style={[styles.actionBtnText, { color: '#000' }]}>Open Session</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
                         </TouchableOpacity>
@@ -293,6 +334,50 @@ export default function HistoryScreen() {
                     }
                 />
             )}
+
+            {/* Station Working Confirmation Modal */}
+            <Modal
+                transparent
+                visible={showWorkingModal}
+                animationType="fade"
+            >
+                <View style={styles.modalOverlay}>
+                    <GlassCard style={styles.modalContent as any} intensity={30}>
+                        <View style={styles.modalIcon}>
+                            <Info size={32} color={COLORS.brandBlue} />
+                        </View>
+                        <Text style={[styles.modalTitle, { color: textPrimary }]}>Start Charging?</Text>
+                        <Text style={[styles.modalSub, { color: textSecondary }]}>
+                            Is the charging station working?
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: COLORS.successGreen + '20', borderColor: COLORS.successGreen }]}
+                                onPress={() => confirmStationWorking(true)}
+                            >
+                                <CheckCircle size={18} color={COLORS.successGreen} />
+                                <Text style={[styles.modalBtnText, { color: COLORS.successGreen }]}>Yes, Station is Working</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: COLORS.alertRed + '20', borderColor: COLORS.alertRed }]}
+                                onPress={() => confirmStationWorking(false)}
+                            >
+                                <XCircle size={18} color={COLORS.alertRed} />
+                                <Text style={[styles.modalBtnText, { color: COLORS.alertRed }]}>No, Station is Not Working</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.modalCancel}
+                            onPress={() => setShowWorkingModal(false)}
+                        >
+                            <Text style={[styles.modalCancelText, { color: textSecondary }]}>Cancel</Text>
+                        </TouchableOpacity>
+                    </GlassCard>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -313,6 +398,9 @@ const styles = StyleSheet.create({
     bookingDetails: { marginBottom: SPACING.md },
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     detailText: { ...TYPOGRAPHY.label, fontSize: 13 },
+    actionRow: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: BORDER_RADIUS.md, borderWidth: 1 },
+    actionBtnText: { ...TYPOGRAPHY.label, fontWeight: '700', fontSize: 12 },
     navigateBtn: { alignSelf: 'flex-start', paddingTop: SPACING.sm },
     navigateText: { ...TYPOGRAPHY.body, color: COLORS.brandBlue, fontWeight: '700', fontSize: 13 },
     sessionCard: { borderRadius: BORDER_RADIUS.md, marginBottom: SPACING.sm, overflow: 'hidden' },
@@ -331,5 +419,15 @@ const styles = StyleSheet.create({
     invoiceBtn: { alignSelf: 'flex-start' },
     invoiceText: { ...TYPOGRAPHY.label, color: COLORS.brandBlue, fontWeight: '700' },
     emptyContainer: { alignItems: 'center', marginTop: 100 },
-    emptyText: { ...TYPOGRAPHY.body, opacity: 0.6 }
+    emptyText: { ...TYPOGRAPHY.body, opacity: 0.6 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+    modalContent: { width: '100%', padding: SPACING.xl, borderRadius: BORDER_RADIUS.xl, alignItems: 'center' },
+    modalIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.brandBlue + '15', justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.md },
+    modalTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 22, marginBottom: 8 },
+    modalSub: { ...TYPOGRAPHY.body, textAlign: 'center', marginBottom: SPACING.xl, opacity: 0.8 },
+    modalButtons: { width: '100%', gap: SPACING.md },
+    modalBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, borderRadius: BORDER_RADIUS.lg, borderWidth: 1 },
+    modalBtnText: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 15 },
+    modalCancel: { marginTop: SPACING.lg },
+    modalCancelText: { ...TYPOGRAPHY.label, fontWeight: '600' },
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator
+    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, MapPin, Zap, Clock, CheckCircle } from 'lucide-react-native';
@@ -12,7 +12,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { getStationSlots, SlotInfo, ConnectorSlots } from '../../services/session.service';
 import { createBooking } from '../../services/booking.service';
 import { useVehicleStore } from '../../store/vehicleStore';
-import { getStationById } from '../../services/stations.service';
+import { getStationById, getAIRecommendations } from '../../services/stations.service';
 
 const DEFAULT_USER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11', 10);
 
@@ -21,7 +21,8 @@ export default function DriverBooking() {
     const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
-    const params = useLocalSearchParams<{ stationId?: string }>();
+    const params = useLocalSearchParams<{ stationId?: string, rank?: string }>();
+    const rank = params.rank;
 
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [confirmed, setConfirmed] = useState(false);
@@ -30,6 +31,10 @@ export default function DriverBooking() {
     const [connectorSlots, setConnectorSlots] = useState<ConnectorSlots[]>([]);
     const [allSlots, setAllSlots] = useState<(SlotInfo & { id: string })[]>([]);
     const [selectedConnectorId, setSelectedConnectorId] = useState<string>('');
+    const [reason, setReason] = useState('');
+    const [showReasonScreen, setShowReasonScreen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [firstRecommendation, setFirstRecommendation] = useState<any>(null);
 
     const scale = useSharedValue(1);
     const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -37,6 +42,7 @@ export default function DriverBooking() {
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
+    const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
 
     useEffect(() => {
         const fetchData = async () => {
@@ -61,6 +67,17 @@ export default function DriverBooking() {
                 setAllSlots(flat as any);
                 if (slotsData.length > 0) {
                     setSelectedConnectorId(slotsData[0].connector_id);
+
+                    // Auto-select first available slot for any rank in driver flow
+                    if (flat.length > 0) {
+                        setSelectedSlot(flat[0].id);
+                    }
+                }
+
+                // If rank=2, fetch first recommendation to show comparison
+                if (rank === '2' && currentVehicleId) {
+                    const recs = await getAIRecommendations(currentVehicleId);
+                    if (recs.length > 0) setFirstRecommendation(recs[0]);
                 }
             } catch (error) {
                 console.error('Error fetching booking data:', error);
@@ -70,7 +87,14 @@ export default function DriverBooking() {
             }
         };
         fetchData();
-    }, [params.stationId]);
+    }, [params.stationId, rank, currentVehicleId]);
+
+    // Auto-confirm if rank=1 and slot is selected
+    useEffect(() => {
+        if (rank === '1' && !loading && !confirmed && !submitting && selectedSlot && station) {
+            handleConfirm();
+        }
+    }, [rank, loading, confirmed, submitting, selectedSlot, station]);
 
     // Get the first connector's data for display
     const connector = connectorSlots[0];
@@ -83,10 +107,24 @@ export default function DriverBooking() {
     const creditsEarned = Math.round(estimatedCost * 0.1);
 
     const handleConfirm = async () => {
-        if (!selectedSlot) {
-            Alert.alert('Select a Slot', 'Please pick an available time slot first.');
+        if (!selectedSlot || submitting) {
+            if (!selectedSlot) Alert.alert('Select a Slot', 'Please pick an available time slot first.');
             return;
         }
+
+        // If rank=2 and not yet showing reason screen, show it first
+        if (rank === '2' && !showReasonScreen) {
+            setShowReasonScreen(true);
+            return;
+        }
+
+        // If showing reason screen but reason is empty, alert
+        if (showReasonScreen && !reason.trim()) {
+            Alert.alert('Reason Required', 'Please provide a reason for choosing this station.');
+            return;
+        }
+
+        setSubmitting(true);
         scale.value = withSpring(0.95, {}, () => { scale.value = withSpring(1); });
 
         try {
@@ -136,9 +174,76 @@ export default function DriverBooking() {
             <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
                 <CheckCircle size={80} color={COLORS.successGreen} />
                 <Text style={[styles.confirmedTitle, { color: textPrimary }]}>Booking Confirmed!</Text>
-                <Text style={[styles.confirmedSub, { color: textSecondary }]}>
-                    Navigating to session…
+                <Text style={[styles.confirmedSub, { color: textSecondary, marginTop: 12 }]}>
+                    Redirecting to History Screen...
                 </Text>
+            </SafeAreaView>
+        );
+    }
+
+    if (showReasonScreen) {
+        const lossPrice = (station?.pricePerKwh ?? 0) - (firstRecommendation?.pricePerKwh ?? 0);
+        const lossDist = (station?.distanceKm ?? 0) - (firstRecommendation?.distanceKm ?? 0);
+
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => setShowReasonScreen(false)} style={styles.backBtn}>
+                        <ArrowLeft size={24} color={textPrimary} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: textPrimary }]}>Confirmation</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                    <Text style={[styles.reasonTitle, { color: textPrimary }]}>
+                        Why did you choose the second recommendation instead of the first?
+                    </Text>
+
+                    <GlassCard style={styles.lossCard as any} intensity={15}>
+                        <Text style={[styles.lossHeader, { color: COLORS.alertRed }]}>Potential Loss Summary</Text>
+
+                        <View style={styles.lossItem}>
+                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Higher Price</Text>
+                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+₹{lossPrice > 0 ? lossPrice.toFixed(2) : '0.00'}/kWh</Text>
+                        </View>
+
+                        <View style={styles.lossItem}>
+                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Further Distance</Text>
+                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+{lossDist > 0 ? lossDist.toFixed(1) : '0.0'} km</Text>
+                        </View>
+
+                        <View style={styles.lossItem}>
+                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Longer Wait</Text>
+                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+15 min</Text>
+                        </View>
+                    </GlassCard>
+
+                    <Text style={[styles.sectionLabel, { color: textSecondary, marginTop: SPACING.xl }]}>Reason for Selection</Text>
+                    <TextInput
+                        style={[styles.reasonInput, { color: textPrimary, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: borderColor }]}
+                        placeholder="Enter your reason here..."
+                        placeholderTextColor={textSecondary}
+                        multiline
+                        numberOfLines={4}
+                        value={reason}
+                        onChangeText={setReason}
+                    />
+
+                    <TouchableOpacity
+                        style={[styles.confirmBtn, { backgroundColor: reason.trim() ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }]}
+                        onPress={handleConfirm}
+                        disabled={submitting}
+                    >
+                        {submitting ? (
+                            <ActivityIndicator color="#000" />
+                        ) : (
+                            <Text style={[styles.confirmText, { color: reason.trim() ? '#000' : textSecondary }]}>
+                                Confirm and Book
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                </ScrollView>
             </SafeAreaView>
         );
     }
@@ -176,65 +281,24 @@ export default function DriverBooking() {
                     </View>
                 </GlassCard>
 
-                {/* Slot Picker */}
-                <Text style={[styles.sectionLabel, { color: textSecondary }]}>Select Time Slot</Text>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.slotScroll}
-                >
-                    {displaySlots.map((slot) => {
-                        const isSelected = selectedSlot === slot.id;
-                        return (
-                            <TouchableOpacity
-                                key={slot.id}
-                                onPress={() => slot.available && setSelectedSlot(slot.id)}
-                                style={[
-                                    styles.slotCard,
-                                    !slot.available && styles.slotUnavailable,
-                                    isSelected && { backgroundColor: COLORS.brandBlue, borderColor: COLORS.brandBlue },
-                                    !isSelected && slot.available && {
-                                        backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                                        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
-                                    }
-                                ]}
-                                activeOpacity={slot.available ? 0.7 : 1}
-                            >
-                                <Text style={[
-                                    styles.slotTime,
-                                    { color: isSelected ? '#000' : slot.available ? textPrimary : textSecondary }
-                                ]}>
-                                    {slot.time}
-                                </Text>
-                                <Text style={[
-                                    styles.slotPrice,
-                                    { color: isSelected ? '#000' : slot.available ? COLORS.successGreen : textSecondary }
-                                ]}>
-                                    {slot.available ? `₹${slot.price_per_kwh}/kWh` : 'Booked'}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+                {/* Driver Booking: Slots and Estimates are hidden to streamline flow */}
+                <View style={{ height: 10 }} />
 
-                {/* Cost Estimate */}
-                <Text style={[styles.sectionLabel, { color: textSecondary }]}>Cost Estimate</Text>
-                <GlassCard style={styles.estimateCard as any} intensity={25}>
+                <GlassCard style={styles.stationCard as any} intensity={15}>
+                    <Text style={[styles.sectionLabel, { color: textSecondary, marginTop: 0 }]}>Booking Details</Text>
                     <View style={styles.estimateRow}>
-                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Estimated kWh needed</Text>
+                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Selected Slot</Text>
+                        <Text style={[styles.estimateValue, { color: COLORS.brandBlue }]}>
+                            {displaySlots.find(s => s.id === selectedSlot)?.time || 'Auto-selected'}
+                        </Text>
+                    </View>
+                    <View style={styles.estimateRow}>
+                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Est. kWh</Text>
                         <Text style={[styles.estimateValue, { color: textPrimary }]}>{estimatedKwh} kWh</Text>
                     </View>
                     <View style={styles.estimateRow}>
-                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Rate</Text>
-                        <Text style={[styles.estimateValue, { color: textPrimary }]}>₹{selectedPrice}/kWh</Text>
-                    </View>
-                    <View style={[styles.estimateRow, styles.estimateDivider]}>
-                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Estimated cost</Text>
-                        <Text style={[styles.estimateTotal, { color: textPrimary }]}>₹{estimatedCost}</Text>
-                    </View>
-                    <View style={styles.estimateRow}>
-                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>VoltCredits to earn</Text>
-                        <Text style={[styles.creditsEarned]}>+{creditsEarned} credits</Text>
+                        <Text style={[styles.estimateLabel, { color: textSecondary }]}>Estimated Cost</Text>
+                        <Text style={[styles.estimateTotal, { color: textPrimary, fontSize: 18 }]}>₹{estimatedCost}</Text>
                     </View>
                 </GlassCard>
 
@@ -247,13 +311,18 @@ export default function DriverBooking() {
                         ]}
                         onPress={handleConfirm}
                         activeOpacity={0.85}
+                        disabled={submitting}
                     >
-                        <Text style={[
-                            styles.confirmText,
-                            { color: selectedSlot ? '#000' : COLORS.textMutedDark }
-                        ]}>
-                            Confirm Booking
-                        </Text>
+                        {submitting ? (
+                            <ActivityIndicator color="#000" />
+                        ) : (
+                            <Text style={[
+                                styles.confirmText,
+                                { color: selectedSlot ? '#000' : COLORS.textMutedDark }
+                            ]}>
+                                {rank === '2' ? 'Book with Reason' : 'Confirm Booking'}
+                            </Text>
+                        )}
                     </TouchableOpacity>
                 </Animated.View>
             </ScrollView>
@@ -328,4 +397,11 @@ const styles = StyleSheet.create({
     confirmText: { ...TYPOGRAPHY.body, fontSize: 16, fontWeight: '700' },
     confirmedTitle: { ...TYPOGRAPHY.hero, fontSize: 28, marginTop: SPACING.xl, textAlign: 'center' },
     confirmedSub: { ...TYPOGRAPHY.body, marginTop: SPACING.sm, textAlign: 'center' },
+    reasonTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 20, marginBottom: SPACING.lg, lineHeight: 28 },
+    lossCard: { padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, backgroundColor: 'rgba(255,68,68,0.05)', borderWidth: 1, borderColor: 'rgba(255,68,68,0.2)' },
+    lossHeader: { ...TYPOGRAPHY.label, fontWeight: '800', marginBottom: SPACING.md, letterSpacing: 0.5 },
+    lossItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
+    lossLabel: { ...TYPOGRAPHY.body, fontSize: 14 },
+    lossValue: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 14 },
+    reasonInput: { height: 120, borderRadius: BORDER_RADIUS.md, borderWidth: 1, padding: SPACING.md, textAlignVertical: 'top', ...TYPOGRAPHY.body, fontSize: 14 },
 });

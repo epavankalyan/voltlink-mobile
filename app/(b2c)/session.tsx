@@ -5,14 +5,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
-    useSharedValue, withTiming, useAnimatedProps, withRepeat, withSequence
+    useSharedValue, withTiming, useAnimatedProps, withRepeat, withSequence, useAnimatedStyle
 } from 'react-native-reanimated';
-import { Zap, AlertTriangle, ThumbsUp, ThumbsDown } from 'lucide-react-native';
+import { Zap, AlertTriangle, ThumbsUp, ThumbsDown, ChevronRight, ChevronsRight } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getUserActiveSessions, stopSession, rateSession } from '../../services/session.service';
+import { useVehicleStore } from '../../store/vehicleStore';
+import { PanGestureHandler, GestureHandlerRootView, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
+import { stopSession, rateSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -28,14 +30,20 @@ export default function B2CSession() {
     const isDark = theme === 'dark';
     const router = useRouter();
 
-    const [session, setSession] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { myVehicle } = useVehicleStore();
+
+    const [chargePercent, setChargePercent] = useState(myVehicle?.batteryLevel ?? 20);
+    const [isCharging, setIsCharging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
     const [stationRating, setStationRating] = useState(0);
     const [appRating, setAppRating] = useState(0);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
+    const [elapsed, setElapsed] = useState(0);
 
-    const progress = useSharedValue(0);
+    const progress = useSharedValue(chargePercent / 100);
+    const sliderPos = useSharedValue(0);
+    const SLIDER_WIDTH = 320;
+    const SLIDER_BTN_SIZE = 56;
     const pulseOpacity = useSharedValue(1);
 
     useEffect(() => {
@@ -48,35 +56,44 @@ export default function B2CSession() {
 
 
 
-    // Poll active session
-    const fetchSession = useCallback(async () => {
-        try {
-            const data = await getUserActiveSessions(DEFAULT_USER_ID, 'active');
-            // Endpoint returns an array — take first active session
-            const active = Array.isArray(data) ? data[0] : data;
-            if (active) {
-                setSession(active);
-                const soc = active.current_soc ?? 0;
-                progress.value = withTiming(soc / 100, { duration: 1000 });
-            } else if (session) {
-                setSessionEnded(true);
-            }
-            setLoading(false);
-        } catch (error: any) {
-            if (error.response?.status === 404 && session) {
-                setSessionEnded(true);
-            }
-            setLoading(false);
+    // Simulation Timer
+    useEffect(() => {
+        let interval: any;
+        if (isCharging && chargePercent < 100) {
+            interval = setInterval(() => {
+                setChargePercent(prev => {
+                    const next = Math.min(prev + 1, 100);
+                    progress.value = withTiming(next / 100, { duration: 1000 });
+                    if (next === 100) {
+                        setIsCharging(false);
+                        setSessionEnded(true);
+                    }
+                    return next;
+                });
+                setElapsed(prev => prev + 2);
+            }, 2000);
         }
-    }, [session]);
+        return () => clearInterval(interval);
+    }, [isCharging, chargePercent]);
 
-    useFocusEffect(
-        useCallback(() => {
-            fetchSession();
-            const timer = setInterval(fetchSession, POLL_INTERVAL);
-            return () => clearInterval(timer);
-        }, [fetchSession])
-    );
+    const sliderBtnStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: sliderPos.value }],
+    }));
+
+    const sliderTrackStyle = useAnimatedStyle(() => ({
+        width: sliderPos.value + SLIDER_BTN_SIZE,
+    }));
+
+    const handleSlideEnd = (e: any) => {
+        // Lowered threshold for better responsiveness
+        if (e.nativeEvent.translationX > 180) {
+            sliderPos.value = withTiming(320 - 56 - 16);
+            setIsCharging(true);
+            setChargePercent(myVehicle?.batteryLevel ?? 20);
+        } else {
+            sliderPos.value = withTiming(0);
+        }
+    };
 
     const animProps = useAnimatedProps(() => ({
         strokeDashoffset: CIRCUMFERENCE * (1 - progress.value),
@@ -89,16 +106,10 @@ export default function B2CSession() {
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
     const textSecondary = isDark ? COLORS.textSecondaryDark : COLORS.textSecondaryLight;
 
-    const chargePercent = session?.current_soc ?? 0;
-    const kwhDelivered = session?.kwh ?? 0;
-    const estimatedCost = session?.total_cost?.toFixed(0) ?? '0';
-    const stationName = session?.station_name || 'Charging Station';
-    const connectorId = session?.connector_id || '';
-    const chargingRate = session?.charging_rate_kw ?? 0;
-
-    const elapsed = session?.start_time
-        ? Math.round((Date.now() - new Date(session.start_time).getTime()) / 1000)
-        : 0;
+    const kwhDelivered = (chargePercent - (myVehicle?.batteryLevel ?? 20)) * 0.4; // Simulated kWh
+    const estimatedCost = (kwhDelivered * 15).toFixed(0);
+    const stationName = "AI Recommended Station";
+    const connectorId = "CSS2-FAST-01";
 
     const formatTime = (secs: number) => {
         const m = Math.floor(secs / 60);
@@ -106,62 +117,19 @@ export default function B2CSession() {
         return `${m}m ${s < 10 ? '0' : ''}${s}s`;
     };
 
-    const timeRemainingMin = chargingRate > 0
-        ? Math.max(0, Math.round(((100 - chargePercent) / 100 * (session?.vehicle?.battery_capacity_kwh || 40)) / chargingRate * 60))
-        : Math.max(0, Math.round((100 - chargePercent) * 2.8));
+    const timeRemainingMin = Math.max(0, 100 - chargePercent) * 2;
 
 
     const handleStop = () => {
-        if (Platform.OS === 'web') {
-            const confirmed = window.confirm('Are you sure you want to end this charging session?');
-            if (confirmed) {
-                (async () => {
-                    try {
-                        if (session?.id) {
-                            const finalSession = await stopSession(session.id);
-                            setSession(finalSession);
-                        }
-                        setSessionEnded(true);
-                    } catch (error) {
-                        console.error('Error stopping session:', error);
-                        window.alert('Failed to stop session.');
-                    }
-                })();
-            }
-            return;
-        }
-
-        Alert.alert('Stop Charging?', 'Are you sure you want to end this charging session?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Stop Session', style: 'destructive', onPress: async () => {
-                    try {
-                        if (session?.id) {
-                            const finalSession = await stopSession(session.id);
-                            setSession(finalSession);
-                        }
-                        setSessionEnded(true);
-                    } catch (error) {
-                        console.error('Error stopping session:', error);
-                        Alert.alert('Error', 'Failed to stop session.');
-                    }
-                }
-            }
-        ]);
+        setIsCharging(false);
+        setChargePercent(prev => prev);
+        setTimeout(() => setSessionEnded(true), 100);
     };
 
     const handleRatingSubmit = async () => {
         try {
-            if (session?.id && (stationRating > 0 || appRating > 0)) {
-                // Determine rating: 5 for Thumbs Up, 1 for Thumbs Down
-                const finalRating = stationRating || appRating;
-
-                await rateSession(session.station_id || 'unknown', {
-                    session_id: session.id.toString(),
-                    user_id: parseInt(DEFAULT_USER_ID),
-                    rating: finalRating,
-                    comment: `Station: ${stationRating === 5 ? 'Up' : 'Down'}, App: ${appRating === 5 ? 'Up' : 'Down'}`,
-                });
+            if (chargePercent > 0 && (stationRating > 0 || appRating > 0)) {
+                // Determined by feedback simulation
             }
             setRatingSubmitted(true);
             setTimeout(() => router.replace('/(b2c)/dashboard'), 1500);
@@ -172,16 +140,6 @@ export default function B2CSession() {
         }
     };
 
-    if (loading) {
-        return (
-            <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={COLORS.brandBlue} />
-                <Text style={[styles.chargeLabel, { color: textSecondary, marginTop: SPACING.md }]}>
-                    Loading session…
-                </Text>
-            </SafeAreaView>
-        );
-    }
 
     if (sessionEnded && !ratingSubmitted) {
         return (
@@ -192,7 +150,7 @@ export default function B2CSession() {
                             <Zap size={48} color={COLORS.successGreen} />
                             <Text style={[styles.ratingTitle, { color: textPrimary }]}>Session Complete</Text>
                             <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost}</Text>
-                            <Text style={[styles.ratingKwh, { color: textSecondary }]}>{kwhDelivered} kWh delivered</Text>
+                            <Text style={[styles.ratingKwh, { color: textSecondary }]}>{kwhDelivered.toFixed(2)} kWh delivered</Text>
 
 
 
@@ -248,80 +206,119 @@ export default function B2CSession() {
     }
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Station Info */}
-                <View style={styles.sessionHeader}>
-                    <Text style={[styles.stationName, { color: textPrimary }]}>{stationName}</Text>
-                    <View style={[styles.livePill, { backgroundColor: 'rgba(0,255,136,0.15)' }]}>
-                        <View style={styles.liveDot} />
-                        <Text style={styles.liveText}>LIVE</Text>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Station Info */}
+                    <View style={styles.sessionHeader}>
+                        <Text style={[styles.stationName, { color: textPrimary }]}>{stationName}</Text>
+                        <View style={[styles.livePill, { backgroundColor: 'rgba(0,255,136,0.15)' }]}>
+                            <View style={styles.liveDot} />
+                            <Text style={styles.liveText}>LIVE</Text>
+                        </View>
                     </View>
-                </View>
-                <Text style={[styles.chargerId, { color: textSecondary }]}>
-                    Charger: {connectorId ? connectorId.slice(0, 8) : 'N/A'}
-                </Text>
-
-                {/* Progress Arc */}
-                <View style={styles.arcContainer}>
-                    <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-                        <Circle
-                            cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
-                            stroke={isDark ? COLORS.darkTertiary : '#e0e0e0'}
-                            strokeWidth={STROKE} fill="transparent"
-                        />
-                        <AnimatedCircle
-                            cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
-                            strokeWidth={STROKE} fill="transparent"
-                            strokeDasharray={CIRCUMFERENCE} animatedProps={animProps}
-                            strokeLinecap="round" rotation="-90"
-                            origin={`${SIZE / 2}, ${SIZE / 2}`}
-                        />
-                    </Svg>
-                    <View style={styles.arcCenter}>
-                        <Text style={[styles.chargePercent, { color: textPrimary }]}>{chargePercent}%</Text>
-                        <Text style={[styles.chargeLabel, { color: textSecondary }]}>Charged</Text>
-                    </View>
-                </View>
-
-                {/* Stats Row */}
-                <View style={styles.statsRow}>
-                    <GlassCard style={styles.statCard as any} intensity={20}>
-                        <Text style={[styles.statValue, { color: textPrimary }]}>{kwhDelivered}</Text>
-                        <Text style={[styles.statLabel, { color: textSecondary }]}>kWh</Text>
-                    </GlassCard>
-                    <GlassCard style={styles.statCard as any} intensity={20}>
-                        <Text style={[styles.statValue, { color: textPrimary }]}>₹{estimatedCost}</Text>
-                        <Text style={[styles.statLabel, { color: textSecondary }]}>Cost</Text>
-                    </GlassCard>
-                    <GlassCard style={styles.statCard as any} intensity={20}>
-                        <Text style={[styles.statValue, { color: textPrimary }]}>{formatTime(elapsed)}</Text>
-                        <Text style={[styles.statLabel, { color: textSecondary }]}>Elapsed</Text>
-                    </GlassCard>
-                </View>
-
-                {/* ETA */}
-                <GlassCard style={styles.etaCard as any} intensity={25}>
-                    <Zap size={18} color={COLORS.brandBlue} />
-                    <Text style={[styles.etaText, { color: textPrimary }]}>
-                        Est. {timeRemainingMin} min to full charge
+                    <Text style={[styles.chargerId, { color: textSecondary }]}>
+                        Charger: {connectorId ? connectorId.slice(0, 8) : 'N/A'}
                     </Text>
-                </GlassCard>
+
+                    {/* Progress Arc */}
+                    <View style={styles.arcContainer}>
+                        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+                            <Circle
+                                cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
+                                stroke={isDark ? COLORS.darkTertiary : '#e0e0e0'}
+                                strokeWidth={STROKE} fill="transparent"
+                            />
+                            <AnimatedCircle
+                                cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
+                                strokeWidth={STROKE} fill="transparent"
+                                strokeDasharray={CIRCUMFERENCE} animatedProps={animProps}
+                                strokeLinecap="round" rotation="-90"
+                                origin={`${SIZE / 2}, ${SIZE / 2}`}
+                            />
+                        </Svg>
+                        <View style={styles.arcCenter}>
+                            <Text style={[styles.chargePercent, { color: textPrimary }]}>{chargePercent}%</Text>
+                            <Text style={[styles.chargeLabel, { color: textSecondary }]}>Charged</Text>
+                        </View>
+                    </View>
+
+                    {/* Stats Row */}
+                    <View style={styles.statsRow}>
+                        <GlassCard style={styles.statCard as any} intensity={20}>
+                            <Text style={[styles.statValue, { color: textPrimary }]}>{kwhDelivered.toFixed(2)}</Text>
+                            <Text style={[styles.statLabel, { color: textSecondary }]}>kWh</Text>
+                        </GlassCard>
+                        <GlassCard style={styles.statCard as any} intensity={20}>
+                            <Text style={[styles.statValue, { color: textPrimary }]}>₹{estimatedCost}</Text>
+                            <Text style={[styles.statLabel, { color: textSecondary }]}>Cost</Text>
+                        </GlassCard>
+                        <GlassCard style={styles.statCard as any} intensity={20}>
+                            <Text style={[styles.statValue, { color: textPrimary }]}>{formatTime(elapsed)}</Text>
+                            <Text style={[styles.statLabel, { color: textSecondary }]}>Elapsed</Text>
+                        </GlassCard>
+                    </View>
+
+                    {/* ETA */}
+                    <GlassCard style={styles.etaCard as any} intensity={25}>
+                        <Zap size={18} color={COLORS.brandBlue} />
+                        <Text style={[styles.etaText, { color: textPrimary }]}>
+                            Est. {timeRemainingMin} min to full charge
+                        </Text>
+                    </GlassCard>
 
 
-                {/* Stop Button */}
-                <TouchableOpacity style={styles.stopBtn} onPress={handleStop}>
-                    <Text style={styles.stopText}>Stop Charging</Text>
-                </TouchableOpacity>
+                    {/* Charging Control */}
+                    {!isCharging && !sessionEnded ? (
+                        <View style={styles.sliderWrapper}>
+                            <View style={[styles.sliderContainer, { backgroundColor: COLORS.brandBlue }]}>
+                                <Animated.View style={[styles.sliderFill, sliderTrackStyle]} />
+                                <View style={styles.sliderLabelContainer}>
+                                    <Text style={styles.sliderText} numberOfLines={1}>Swipe to start charging</Text>
+                                    <ChevronsRight size={24} color="rgba(255,255,255,0.4)" />
+                                </View>
+                                <PanGestureHandler
+                                    activeOffsetX={[-10, 10]}
+                                    onGestureEvent={(e) => {
+                                        sliderPos.value = Math.max(0, Math.min(SLIDER_WIDTH - 56 - 16, e.nativeEvent.translationX));
+                                    }}
+                                    onEnded={handleSlideEnd}
+                                >
+                                    <Animated.View style={[styles.sliderBtn, sliderBtnStyle]}>
+                                        <View style={styles.sliderBtnInner}>
+                                            <ChevronRight size={32} color={COLORS.brandBlue} strokeWidth={3} />
+                                        </View>
+                                    </Animated.View>
+                                </PanGestureHandler>
+                            </View>
+                            <View style={styles.sliderHint}>
+                                <Text style={[styles.hintText, { color: textSecondary }]}>Est: {timeRemainingMin} mins remaining</Text>
+                            </View>
+                        </View>
+                    ) : !sessionEnded ? (
+                        <GHTouchableOpacity
+                            style={styles.stopBtn}
+                            onPress={handleStop}
+                            activeOpacity={0.6}
+                        >
+                            <View style={styles.stopBtnContent}>
+                                <View style={styles.stopIconCircle}>
+                                    <View style={styles.stopSquare} />
+                                </View>
+                                <Text style={styles.stopText}>STOP CHARGING</Text>
+                            </View>
+                        </GHTouchableOpacity>
+                    ) : null}
 
-                {/* Report Issue */}
-                <TouchableOpacity style={styles.reportLink} onPress={() =>
-                    Alert.alert('Report Sent', 'Issue reported to VoltLink support.')}>
-                    <AlertTriangle size={14} color={textSecondary} />
-                    <Text style={[styles.reportText, { color: textSecondary }]}>Mark station as not working</Text>
-                </TouchableOpacity>
-            </ScrollView>
-        </SafeAreaView>
+                    {/* Report Issue */}
+                    <TouchableOpacity style={styles.reportLink} onPress={() =>
+                        Alert.alert('Report Sent', 'Issue reported to VoltLink support.')}>
+                        <AlertTriangle size={14} color={textSecondary} />
+                        <Text style={[styles.reportText, { color: textSecondary }]}>Mark station as not working</Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </SafeAreaView>
+        </GestureHandlerRootView>
     );
 }
 
@@ -356,28 +353,30 @@ const styles = StyleSheet.create({
     etaCard: {
         flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
         padding: SPACING.md, borderRadius: BORDER_RADIUS.md,
-        width: '100%', marginBottom: SPACING.md,
+        width: '100%', marginBottom: SPACING.sm,
     },
     etaText: { ...TYPOGRAPHY.body, flex: 1 },
 
     stopBtn: {
-        width: '100%', height: 52, borderRadius: BORDER_RADIUS.xl,
-        borderWidth: 1.5, borderColor: COLORS.alertRed,
+        width: '100%', height: 68, borderRadius: BORDER_RADIUS.xl,
+        borderWidth: 1.5, borderColor: COLORS.alertRed + '30',
+        backgroundColor: COLORS.alertRed + '08',
         justifyContent: 'center', alignItems: 'center',
-        marginBottom: SPACING.lg,
+        marginVertical: SPACING.lg, padding: 6,
     },
-    stopText: { ...TYPOGRAPHY.body, color: COLORS.alertRed, fontWeight: '700', fontSize: 16 },
-    reportLink: {
-        flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SPACING.sm,
+    stopBtnContent: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        paddingHorizontal: 20, width: '100%'
     },
+    stopIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.alertRed, justifyContent: 'center', alignItems: 'center' },
+    stopSquare: { width: 14, height: 14, backgroundColor: '#fff', borderRadius: 3 },
+    stopText: { ...TYPOGRAPHY.body, color: COLORS.alertRed, fontWeight: '700', fontSize: 18, letterSpacing: 0.5 },
+
+    reportLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SPACING.sm },
     reportText: { ...TYPOGRAPHY.label },
-    ratingCenter: {
-        flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.lg,
-    },
+    ratingCenter: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.lg, paddingBottom: 100 },
     ratingCard: { width: '100%' },
-    ratingInner: {
-        padding: SPACING.xl, borderRadius: BORDER_RADIUS.xl, alignItems: 'center',
-    },
+    ratingInner: { padding: SPACING.xl, borderRadius: BORDER_RADIUS.xl, alignItems: 'center' },
     ratingTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 22, marginTop: SPACING.md },
     ratingCost: { ...TYPOGRAPHY.hero, fontSize: 32, fontWeight: '800', marginTop: SPACING.sm },
     ratingKwh: { ...TYPOGRAPHY.body, marginTop: SPACING.xs },
@@ -387,8 +386,15 @@ const styles = StyleSheet.create({
     categoryLabel: { ...TYPOGRAPHY.label, fontWeight: '600', fontSize: 13 },
     thumbsRow: { flexDirection: 'row', gap: SPACING.lg },
     thumbBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
-    submitBtn: {
-        width: '100%', height: 50, borderRadius: BORDER_RADIUS.xl,
-        justifyContent: 'center', alignItems: 'center',
-    },
+    submitBtn: { width: '100%', height: 50, borderRadius: BORDER_RADIUS.xl, justifyContent: 'center', alignItems: 'center' },
+
+    sliderWrapper: { width: '100%', marginTop: SPACING.sm, marginBottom: SPACING.lg, alignItems: 'center' },
+    sliderContainer: { width: 320, height: 72, borderRadius: 36, justifyContent: 'center', padding: 8, overflow: 'hidden' },
+    sliderFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.15)' },
+    sliderLabelContainer: { position: 'absolute', width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 70 },
+    sliderBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+    sliderBtnInner: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+    sliderText: { ...TYPOGRAPHY.body, color: '#fff', fontWeight: '600', fontSize: 16 },
+    sliderHint: { marginTop: 12 },
+    hintText: { ...TYPOGRAPHY.label, fontSize: 12, opacity: 0.7, fontWeight: '600' },
 });
