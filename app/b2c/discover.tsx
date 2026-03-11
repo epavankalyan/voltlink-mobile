@@ -139,7 +139,7 @@ export default function DiscoverScreen() {
 
         return (
             <View style={[styles.card, { backgroundColor: surfaceBg, borderColor }]}>
-                <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(b2c)/booking' as any)}>
+                <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/b2c/booking' as any)}>
                     <View style={styles.cardTop}>
                         <View style={styles.nameRow}>
                             <View style={[styles.dotOuter, { backgroundColor: `${dot}20` }]}>
@@ -193,7 +193,7 @@ export default function DiscoverScreen() {
                     <View style={[styles.sep, { backgroundColor: borderColor }]} />
                     <TouchableOpacity
                         style={[styles.actionBtn, { flex: 1.6 }, !ok && { opacity: 0.45 }]}
-                        onPress={() => router.push('/(b2c)/booking' as any)}
+                        onPress={() => router.push('/b2c/booking' as any)}
                         disabled={!ok}
                     >
                         <Text style={[styles.actionText, { color: COLORS.brandBlue, fontWeight: '800', fontSize: 13 }]}>

@@ -50,7 +50,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
     const handleSwitchRole = () => {
         switchRole();
         const newRole = role === 'driver' ? 'b2c' : 'driver';
-        router.replace(newRole === 'driver' ? '/(driver)/dashboard' : '/(b2c)/dashboard');
+        router.replace(newRole === 'driver' ? '/driver/dashboard' : '/b2c/dashboard');
     };
 
     const handleRemoveMember = (id: string) => {
@@ -116,18 +116,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
                         <View style={styles.sustainGrid}>
                             <GlassCard style={styles.sustainItem} intensity={10}>
                                 <Leaf size={20} color={COLORS.successGreen} />
-                                <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.greenScore || 0}</Text>
+                                <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.greenScore ?? '--'}</Text>
                                 <Text style={[styles.sustainLabel, { color: textSecondary }]}>Green Score</Text>
                             </GlassCard>
                             <GlassCard style={styles.sustainItem} intensity={10}>
                                 <Cloud size={20} color={COLORS.brandBlue} />
-                                <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.carbonSavedKg || 0}kg</Text>
+                                <Text style={[styles.sustainValue, { color: textPrimary }]}>{sustainability?.carbonSavedKg ?? '--'}kg</Text>
                                 <Text style={[styles.sustainLabel, { color: textSecondary }]}>CO2 Saved</Text>
                             </GlassCard>
 
                             <GlassCard style={styles.sustainItem} intensity={10}>
                                 <Trophy size={20} color={COLORS.warningOrange} />
-                                <Text style={[styles.sustainValue, { color: textPrimary }]}>#{sustainability?.carbonRank || '--'}</Text>
+                                <Text style={[styles.sustainValue, { color: textPrimary }]}>#{sustainability?.carbonRank ?? '--'}</Text>
                                 <Text style={[styles.sustainLabel, { color: textSecondary }]}>Global Rank</Text>
                             </GlassCard>
                         </View>
@@ -151,7 +151,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
                                     <View key={member.id} style={[styles.menuItem, idx === familyVehicles.length - 1 ? { borderBottomWidth: 0 } : { borderBottomColor: borderColor }]}>
                                         <View style={styles.menuLeft}>
                                             <View style={styles.memberAvatar}>
-                                                <Text style={styles.memberInitial}>{member.memberName[0]}</Text>
+                                                <Text style={styles.memberInitial}>{member.memberName?.[0] || '?'}</Text>
                                             </View>
                                             <View>
                                                 <Text style={[styles.menuText, { color: textPrimary }]}>{member.memberName}</Text>

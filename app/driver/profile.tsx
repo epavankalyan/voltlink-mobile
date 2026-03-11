@@ -44,8 +44,8 @@ export default function DriverProfile() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: isDark ? COLORS.darkBg : COLORS.lightBg }]} edges={['top']}>
             <ProfileView
-                name={profile?.name || vehicle?.driverName || 'Driver'}
-                email={profile?.email || vehicle?.driverEmail || 'driver@voltlink.com'}
+                name={profile?.name || vehicle?.driverName}
+                email={profile?.email || vehicle?.driverEmail}
                 role="driver"
             />
         </SafeAreaView>

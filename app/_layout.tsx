@@ -22,15 +22,21 @@ export default function RootLayout() {
     useEffect(() => {
         if (!isReady) return;
 
-        const inDriverGroup = segments[0] === '(driver)';
-        const inB2CGroup = segments[0] === '(b2c)';
+        const inDriverGroup = segments[0] === 'driver';
+        const inB2CGroup = segments[0] === 'b2c';
 
         if (!activeRole && (inDriverGroup || inB2CGroup)) {
             // Need a role to access these groups
             router.replace('/');
         } else if (activeRole && !inDriverGroup && !inB2CGroup) {
             // If at root but has role, go to dashboard
-            router.replace(activeRole === 'driver' ? '/(driver)/dashboard' : '/(b2c)/dashboard');
+            router.replace(activeRole === 'driver' ? '/driver/dashboard' : '/b2c/dashboard');
+        } else if (activeRole === 'driver' && inB2CGroup) {
+            // Mismatch: Driver trying to access B2C
+            router.replace('/driver/dashboard');
+        } else if (activeRole === 'b2c' && inDriverGroup) {
+            // Mismatch: B2C trying to access Driver
+            router.replace('/b2c/dashboard');
         }
     }, [activeRole, segments, isReady]);
 
@@ -48,8 +54,8 @@ export default function RootLayout() {
                     }}
                 >
                     <Stack.Screen name="index" />
-                    <Stack.Screen name="(driver)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(b2c)" options={{ headerShown: false }} />
+                    <Stack.Screen name="driver" options={{ headerShown: false }} />
+                    <Stack.Screen name="b2c" options={{ headerShown: false }} />
                 </Stack>
             </View>
         </GestureHandlerRootView>

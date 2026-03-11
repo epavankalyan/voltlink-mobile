@@ -13,7 +13,7 @@ export default function B2CProfile() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getB2CStats()
+        getB2CStats(undefined, true)
             .then(setStats)
             .finally(() => setLoading(false));
     }, []);
@@ -29,8 +29,8 @@ export default function B2CProfile() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: isDark ? COLORS.darkBg : COLORS.lightBg }]} edges={['top']}>
             <ProfileView
-                name={stats?.user?.name || 'User'}
-                email={stats?.user?.email || 'user@voltlink.com'}
+                name={stats?.user?.name}
+                email={stats?.user?.email}
                 role="b2c"
             />
         </SafeAreaView>

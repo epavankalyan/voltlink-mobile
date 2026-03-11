@@ -166,14 +166,14 @@ export default function HistoryScreen() {
         setShowWorkingModal(false);
         if (isWorking) {
             router.push({
-                pathname: '/(b2c)/session',
+                pathname: '/b2c/session',
                 params: { sessionId: verifyingStation! }
             });
         } else {
             Alert.alert(
                 "Station Issue",
                 "We're sorry the station is not working. Redirecting you to Home to find another recommendation.",
-                [{ text: "OK", onPress: () => router.replace('/(b2c)/dashboard') }]
+                [{ text: "OK", onPress: () => router.replace('/b2c/dashboard') }]
             );
         }
     };
@@ -197,7 +197,7 @@ export default function HistoryScreen() {
                         <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => router.push({
-                                pathname: '/(b2c)/session',
+                                pathname: '/b2c/session',
                                 params: { sessionId: item.id }
                             })}
                             style={{ padding: SPACING.lg }}

@@ -100,7 +100,7 @@ export default function RecommendationsScreen() {
                         recommendation={item}
                         rank={index + 1}
                         isPrimary={index === 0}
-                        onBook={() => router.push(`/(driver)/booking?rank=${index + 1}` as any)}
+                        onBook={() => router.push(`/driver/booking?rank=${index + 1}` as any)}
                         onRate={() => {
                             setSelectedStation(item);
                             setShowRating(true);

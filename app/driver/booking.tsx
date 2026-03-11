@@ -153,7 +153,7 @@ export default function DriverBooking() {
             });
             setConfirmed(true);
             setTimeout(() => {
-                router.replace('/(driver)/history');
+                router.replace('/driver/history');
             }, 1800);
         } catch (error) {
             console.error('Error creating session:', error);

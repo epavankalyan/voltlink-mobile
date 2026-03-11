@@ -22,21 +22,6 @@ export const createBooking = async (
     return apiClient.post('/bookings', data).then(res => res.data);
 };
 
-export const getBookingById = async (id: string, forceRefresh?: boolean): Promise<Booking> => {
-    return fetchWithCache(`/bookings/${id}`, { forceRefresh });
-};
-
-export const updateBooking = async (
-    id: string,
-    data: UpdateBookingRequest
-): Promise<Booking> => {
-    return apiClient.put(`/bookings/${id}`, data).then(res => res.data);
-};
-
-export const deleteBooking = async (id: string): Promise<void> => {
-    return apiClient.delete(`/bookings/${id}`).then(res => res.data);
-};
-
 export const cancelBooking = async (
     id: string,
     data?: CancelBookingRequest

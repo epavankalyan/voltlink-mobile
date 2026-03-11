@@ -35,8 +35,8 @@ interface VehicleState {
     addFamilyVehicle: (vehicle: Omit<FamilyVehicle, 'id'>) => void;
     removeFamilyVehicle: (id: string) => void;
     updateMyVehicleBattery: (level: number) => void;
-    setCurrentVehicleId: (id: string) => void;
-    fetchMyVehicle: (vehicleId?: string) => Promise<void>;
+    setCurrentVehicleId: (id: string | null) => void;
+    fetchMyVehicle: (vehicleId?: string | null) => Promise<void>;
     fetchFamilyVehicles: (userId?: string) => Promise<void>;
     addFamilyMemberApi: (data: { name: string; relation: string }) => Promise<void>;
     removeFamilyMemberApi: (memberId: string | number) => Promise<void>;
@@ -70,10 +70,13 @@ export const useVehicleStore = create<VehicleState>()(
                 myVehicle: { ...state.myVehicle, batteryLevel: level }
             })),
             setCurrentVehicleId: (id) => set({ currentVehicleId: id }),
-            fetchMyVehicle: async (vehicleId?: string) => {
+            fetchMyVehicle: async (vehicleId?: string | null) => {
                 try {
-                    const id = vehicleId || get().currentVehicleId;
-                    if (!id) return;
+                    const id = vehicleId !== undefined ? vehicleId : get().currentVehicleId;
+                    if (!id) {
+                        set({ myVehicle: EMPTY_VEHICLE, currentVehicleId: null });
+                        return;
+                    }
 
                     const res = await apiClient.get(`/vehicles/${id}/extended`);
                     const d = res.data.data || res.data;
@@ -92,6 +95,7 @@ export const useVehicleStore = create<VehicleState>()(
                     });
                 } catch (error) {
                     console.error('Error fetching vehicle data:', error);
+                    set({ myVehicle: EMPTY_VEHICLE });
                 }
             },
             fetchFamilyVehicles: async (userId?: string) => {
@@ -102,14 +106,15 @@ export const useVehicleStore = create<VehicleState>()(
                     set({
                         familyVehicles: data.map((m: any) => ({
                             id: String(m.id),
-                            memberName: m.name || 'Member',
-                            vehicleModel: m.vehicle_model || 'EV',
-                            batteryLevel: m.battery_level || 80,
-                            coordinates: m.coordinates || { latitude: 12.9716, longitude: 77.5946 }
+                            memberName: m.name,
+                            vehicleModel: m.vehicle_model,
+                            batteryLevel: m.battery_level,
+                            coordinates: m.coordinates
                         }))
                     });
                 } catch (error) {
                     console.error('Error fetching family:', error);
+                    set({ familyVehicles: [] });
                 }
             },
             addFamilyMemberApi: async (data) => {

@@ -35,19 +35,8 @@ export const getStationSlots = async (
 // Session lifecycle
 // ---------------------------------------------------------------------------
 
-export interface CreateSessionRequest {
-    connector_id: string;
-    vehicle_id: string;
-    user_id: number;
-    booking_id?: string;
-    start_soc?: number;
-}
 
-/**
- * Start a new charging session.
- */
-export const createSession = async (data: CreateSessionRequest) =>
-    apiClient.post('/sessions', data).then(res => res.data);
+
 
 /**
  * Stop an active charging session.
@@ -84,8 +73,9 @@ export const getVehicleActiveSession = async (vehicleId: string) =>
 export const getUserActiveSessions = async (
     userId: string = DEFAULT_USER_ID,
     status?: string,
+    forceRefresh?: boolean
 ) =>
     apiClient
-        .get(`/users/${userId}/sessions`, { params: { status } })
+        .get(`/users/${userId}/sessions`, { params: { status }, ...({ forceRefresh } as any) })
         .then(res => res.data);
 

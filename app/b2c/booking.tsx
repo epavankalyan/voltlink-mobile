@@ -161,7 +161,7 @@ export default function B2CBooking() {
                     clearInterval(interval);
                     // Auto-navigate to history after a short delay
                     setTimeout(() => {
-                        router.replace('/(b2c)/history');
+                        router.replace('/b2c/history');
                     }, 2000);
                 }
                 step++;
@@ -178,7 +178,7 @@ export default function B2CBooking() {
     useEffect(() => {
         if (confirmed && !isAI) {
             const timer = setTimeout(() => {
-                router.replace('/(b2c)/history');
+                router.replace('/b2c/history');
             }, 1500);
             return () => clearTimeout(timer);
         }

@@ -131,14 +131,14 @@ export default function DriverHistory() {
         setShowWorkingModal(false);
         if (isWorking) {
             router.push({
-                pathname: '/(driver)/session',
+                pathname: '/driver/session',
                 params: { sessionId: verifyingStation! }
             });
         } else {
             Alert.alert(
                 "Station Issue",
                 "We're sorry the station is not working. Redirecting you to Home to find another recommendation.",
-                [{ text: "OK", onPress: () => router.replace('/(driver)/dashboard') }]
+                [{ text: "OK", onPress: () => router.replace('/driver/dashboard') }]
             );
         }
     };
@@ -209,7 +209,7 @@ export default function DriverHistory() {
                 <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => router.push({
-                        pathname: '/(driver)/session',
+                        pathname: '/driver/session',
                         params: { sessionId: item.id }
                     })}
                     style={{ padding: SPACING.md }}

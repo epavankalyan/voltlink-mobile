@@ -38,7 +38,7 @@ export default function RoleSelector() {
     const handleContinue = () => {
         if (selected) {
             setRole(selected);
-            router.replace(selected === 'driver' ? '/(driver)/dashboard' : '/(b2c)/dashboard');
+            router.replace(selected === 'driver' ? '/driver/dashboard' : '/b2c/dashboard');
         }
     };
 

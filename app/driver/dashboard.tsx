@@ -130,7 +130,7 @@ const DriverDashboard = () => {
                             </View>
                             <TouchableOpacity
                                 style={styles.profileAvatar}
-                                onPress={() => router.push('/(driver)/profile' as any)}
+                                onPress={() => router.push('/driver/profile' as any)}
                             >
                                 <User size={18} color={textPrimary} />
                             </TouchableOpacity>
@@ -142,7 +142,7 @@ const DriverDashboard = () => {
                 {batteryLow && (
                     <TouchableOpacity
                         style={styles.alertBanner}
-                        onPress={() => router.push('/(driver)/recommendations' as any)}
+                        onPress={() => router.push('/driver/recommendations' as any)}
                         activeOpacity={0.85}
                     >
                         <AlertTriangle size={18} color={COLORS.alertRed} />
@@ -155,7 +155,7 @@ const DriverDashboard = () => {
                 {vehicle && (
                     <VehicleCard
                         vehicle={vehicle}
-                        onPress={() => router.push('/(driver)/recommendations' as any)}
+                        onPress={() => router.push('/driver/recommendations' as any)}
                     />
                 )}
 
@@ -176,7 +176,7 @@ const DriverDashboard = () => {
                         recommendation={item}
                         rank={index + 1}
                         isPrimary={index === 0}
-                        onBook={() => router.push(`/(driver)/booking?rank=${index + 1}` as any)}
+                        onBook={() => router.push(`/driver/booking?rank=${index + 1}` as any)}
                     />
                 ))}
             </ScrollView>

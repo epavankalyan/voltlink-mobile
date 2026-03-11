@@ -4,12 +4,11 @@ const DEFAULT_FLEET_ID = process.env.EXPO_PUBLIC_DEFAULT_FLEET_ID ?? '1';
 const DEFAULT_DRIVER_ID = process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4';
 
 export const getDriverProfile = async (driverId: string = DEFAULT_DRIVER_ID, forceRefresh?: boolean) =>
-    fetchWithCache(`/users/${driverId}`, { forceRefresh }).then(data => data?.data || data);
+    fetchWithCache(`/users/${driverId}`, { forceRefresh });
 
 export const getVehiclesByDriver = async (driverId: string = DEFAULT_DRIVER_ID, forceRefresh?: boolean) =>
     fetchWithCache(`/users/${driverId}`, { forceRefresh }).then(data => {
-        const d = data?.data || data;
-        return d?.vehicles || [];
+        return data?.vehicles || [];
     });
 
 export const getVehicleDashboard = async (vehicleId: string, forceRefresh?: boolean) =>
@@ -52,5 +51,3 @@ export const getDriverSessions = async (
         params: { vehicle_id: vehicleId, status }, forceRefresh
     }).then(data => data?.data || []);
 
-export const getNotifications = async (fleetId: string = DEFAULT_FLEET_ID, forceRefresh?: boolean) =>
-    fetchWithCache(`/fleets/${fleetId}/alerts`, { forceRefresh });

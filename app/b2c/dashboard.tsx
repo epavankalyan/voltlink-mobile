@@ -95,6 +95,9 @@ const B2CDashboard = () => {
             if (vehicleId) {
                 setCurrentVehicleId(vehicleId);
                 await fetchMyVehicle(vehicleId);
+            } else {
+                setCurrentVehicleId(null);
+                await fetchMyVehicle(null);
             }
         } catch (error) {
             console.error('Error fetching B2C dashboard data:', error);
@@ -147,7 +150,7 @@ const B2CDashboard = () => {
                             </View>
                             <TouchableOpacity
                                 style={[styles.profileAvatar, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
-                                onPress={() => router.push('/(b2c)/profile' as any)}
+                                onPress={() => router.push('/b2c/profile' as any)}
                             >
                                 <User size={20} color={textPrimary} />
                             </TouchableOpacity>
@@ -156,10 +159,12 @@ const B2CDashboard = () => {
                 </View>
 
                 {/* Vehicle Card */}
-                <VehicleCard
-                    vehicle={myVehicle as any}
-                    onPress={() => router.push('/(b2c)/discover' as any)}
-                />
+                {myVehicle?.id ? (
+                    <VehicleCard
+                        vehicle={myVehicle as any}
+                        onPress={() => router.push('/b2c/discover' as any)}
+                    />
+                ) : null}
 
                 {/* Quick Stats */}
                 <View style={styles.statsRow}>
@@ -181,22 +186,6 @@ const B2CDashboard = () => {
                     />
                 </View>
 
-                {/* Credits Hero Card */}
-                <TouchableOpacity onPress={() => router.push('/(b2c)/credits')}>
-                    <GlassCard style={styles.creditCard as any} intensity={40}>
-                        <View style={styles.creditHeader}>
-                            <View style={styles.creditInfo}>
-                                <Text style={styles.creditLabel}>{t.availableCredits}</Text>
-                                <Text style={styles.creditValue}>{stats?.availableCredits || 0}</Text>
-                            </View>
-                            <Wallet color="#FFF" size={32} />
-                        </View>
-                        <View style={styles.creditFooter}>
-                            <Text style={styles.creditSubtext}>{t.viewHistory}</Text>
-                            <ChevronRight color="#FFF" size={16} />
-                        </View>
-                    </GlassCard>
-                </TouchableOpacity>
 
                 {/* AI Recommendations Section */}
                 {aiStations.length > 0 && (
@@ -206,7 +195,7 @@ const B2CDashboard = () => {
                                 <Bot size={14} color={COLORS.brandBlue} />
                                 <Text style={[styles.familyTitle, { color: textSecondary }]}>{t.aiRec}</Text>
                             </View>
-                            <TouchableOpacity onPress={() => router.push('/(b2c)/discover' as any)}>
+                            <TouchableOpacity onPress={() => router.push('/b2c/discover' as any)}>
                                 <Text style={[styles.seeAllText, { color: COLORS.brandBlue }]}>See all</Text>
                             </TouchableOpacity>
                         </View>
@@ -224,7 +213,7 @@ const B2CDashboard = () => {
                                         key={station.id}
                                         activeOpacity={0.85}
                                         onPress={() => router.push({
-                                            pathname: '/(b2c)/booking',
+                                            pathname: '/b2c/booking',
                                             params: { stationId: station.id, isAI: 'true' }
                                         } as any)}
                                     >
@@ -275,7 +264,7 @@ const B2CDashboard = () => {
                                             <TouchableOpacity
                                                 style={[styles.aiBookBtn, !ok && { opacity: 0.4 }]}
                                                 onPress={() => router.push({
-                                                    pathname: '/(b2c)/booking',
+                                                    pathname: '/b2c/booking',
                                                     params: { stationId: station.id, isAI: 'true' }
                                                 } as any)}
                                                 disabled={!ok}
@@ -294,7 +283,7 @@ const B2CDashboard = () => {
                 {/* Find Stations CTA */}
                 <TouchableOpacity
                     style={styles.discoverCta}
-                    onPress={() => router.push('/(b2c)/discover' as any)}
+                    onPress={() => router.push('/b2c/discover' as any)}
                     activeOpacity={0.85}
                 >
                     <Map size={20} color={COLORS.brandBlue} />

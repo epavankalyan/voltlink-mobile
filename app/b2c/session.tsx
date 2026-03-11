@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Platform
+    StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, Switch, ActivityIndicator, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
     useSharedValue, withTiming, useAnimatedProps, withRepeat, withSequence, useAnimatedStyle
 } from 'react-native-reanimated';
-import { PanGestureHandler, GestureHandlerRootView, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import { Zap, AlertTriangle, ThumbsUp, ThumbsDown, ChevronRight, ChevronsRight } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getVehicleActiveSession, stopSession, rateSession } from '../../services/session.service';
 import { useVehicleStore } from '../../store/vehicleStore';
+import { PanGestureHandler, GestureHandlerRootView, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
+import { stopSession, rateSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -23,15 +23,15 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
-const POLL_INTERVAL = Number(process.env.EXPO_PUBLIC_SESSION_POLL_INTERVAL ?? 30000); // Default to 30 seconds
+const POLL_INTERVAL = Number(process.env.EXPO_PUBLIC_SESSION_POLL_INTERVAL ?? 30000);
 
-export default function SessionScreen() {
+export default function B2CSession() {
     const { theme } = useThemeStore();
-    const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
 
     const { myVehicle } = useVehicleStore();
+
     const [chargePercent, setChargePercent] = useState(myVehicle?.batteryLevel ?? 20);
     const [isCharging, setIsCharging] = useState(false);
     const [sessionEnded, setSessionEnded] = useState(false);
@@ -46,7 +46,6 @@ export default function SessionScreen() {
     const SLIDER_BTN_SIZE = 56;
     const pulseOpacity = useSharedValue(1);
 
-    // Pulse the ring
     useEffect(() => {
         pulseOpacity.value = withRepeat(
             withSequence(withTiming(0.4, { duration: 900 }), withTiming(1, { duration: 900 })),
@@ -54,6 +53,8 @@ export default function SessionScreen() {
             true
         );
     }, []);
+
+
 
     // Simulation Timer
     useEffect(() => {
@@ -108,7 +109,6 @@ export default function SessionScreen() {
     const kwhDelivered = (chargePercent - (myVehicle?.batteryLevel ?? 20)) * 0.4; // Simulated kWh
     const estimatedCost = (kwhDelivered * 15).toFixed(0);
     const stationName = "AI Recommended Station";
-    const connectorType = "CCS2 DC Fast";
     const connectorId = "CSS2-FAST-01";
 
     const formatTime = (secs: number) => {
@@ -119,6 +119,7 @@ export default function SessionScreen() {
 
     const timeRemainingMin = Math.max(0, 100 - chargePercent) * 2;
 
+
     const handleStop = () => {
         setIsCharging(false);
         setChargePercent(prev => prev);
@@ -128,14 +129,14 @@ export default function SessionScreen() {
     const handleRatingSubmit = async () => {
         try {
             if (chargePercent > 0 && (stationRating > 0 || appRating > 0)) {
-                // Feedback simulation
+                // Determined by feedback simulation
             }
             setRatingSubmitted(true);
-            setTimeout(() => router.replace('/(driver)/dashboard'), 1500);
+            setTimeout(() => router.replace('/b2c/dashboard'), 1500);
         } catch (error) {
             console.error('Error submitting rating:', error);
             Alert.alert('Error', 'Failed to submit feedback. Taking you to dashboard.');
-            router.replace('/(driver)/dashboard');
+            router.replace('/b2c/dashboard');
         }
     };
 
@@ -148,10 +149,12 @@ export default function SessionScreen() {
                         <GlassCard style={styles.ratingInner as any} intensity={30}>
                             <Zap size={48} color={COLORS.successGreen} />
                             <Text style={[styles.ratingTitle, { color: textPrimary }]}>Session Complete</Text>
-                            <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost} charged</Text>
+                            <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost}</Text>
                             <Text style={[styles.ratingKwh, { color: textSecondary }]}>{kwhDelivered.toFixed(2)} kWh delivered</Text>
 
-                            <Text style={[styles.ratingPrompt, { color: textSecondary }]}>Rate your charging experience</Text>
+
+
+                            <Text style={[styles.ratingPrompt, { color: textSecondary }]}>Rate your experience</Text>
 
                             <View style={styles.ratingSection}>
                                 <View style={styles.ratingRowCategory}>
@@ -215,30 +218,22 @@ export default function SessionScreen() {
                         </View>
                     </View>
                     <Text style={[styles.chargerId, { color: textSecondary }]}>
-                        Charger: {connectorId ? connectorId.slice(0, 8) : 'N/A'} · {connectorType}
+                        Charger: {connectorId ? connectorId.slice(0, 8) : 'N/A'}
                     </Text>
 
                     {/* Progress Arc */}
                     <View style={styles.arcContainer}>
                         <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
                             <Circle
-                                cx={SIZE / 2}
-                                cy={SIZE / 2}
-                                r={RADIUS}
+                                cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
                                 stroke={isDark ? COLORS.darkTertiary : '#e0e0e0'}
-                                strokeWidth={STROKE}
-                                fill="transparent"
+                                strokeWidth={STROKE} fill="transparent"
                             />
                             <AnimatedCircle
-                                cx={SIZE / 2}
-                                cy={SIZE / 2}
-                                r={RADIUS}
-                                strokeWidth={STROKE}
-                                fill="transparent"
-                                strokeDasharray={CIRCUMFERENCE}
-                                animatedProps={animProps}
-                                strokeLinecap="round"
-                                rotation="-90"
+                                cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
+                                strokeWidth={STROKE} fill="transparent"
+                                strokeDasharray={CIRCUMFERENCE} animatedProps={animProps}
+                                strokeLinecap="round" rotation="-90"
                                 origin={`${SIZE / 2}, ${SIZE / 2}`}
                             />
                         </Svg>
@@ -268,9 +263,10 @@ export default function SessionScreen() {
                     <GlassCard style={styles.etaCard as any} intensity={25}>
                         <Zap size={18} color={COLORS.brandBlue} />
                         <Text style={[styles.etaText, { color: textPrimary }]}>
-                            Est. {timeRemainingMin} min remaining to full charge
+                            Est. {timeRemainingMin} min to full charge
                         </Text>
                     </GlassCard>
+
 
                     {/* Charging Control */}
                     {!isCharging && !sessionEnded ? (
@@ -284,7 +280,7 @@ export default function SessionScreen() {
                                 <PanGestureHandler
                                     activeOffsetX={[-10, 10]}
                                     onGestureEvent={(e) => {
-                                        sliderPos.value = Math.max(0, Math.min(320 - 56 - 16, e.nativeEvent.translationX));
+                                        sliderPos.value = Math.max(0, Math.min(SLIDER_WIDTH - 56 - 16, e.nativeEvent.translationX));
                                     }}
                                     onEnded={handleSlideEnd}
                                 >
@@ -316,7 +312,7 @@ export default function SessionScreen() {
 
                     {/* Report Issue */}
                     <TouchableOpacity style={styles.reportLink} onPress={() =>
-                        Alert.alert('Report Sent', 'Charger issue reported to VoltLink support.')}>
+                        Alert.alert('Report Sent', 'Issue reported to VoltLink support.')}>
                         <AlertTriangle size={14} color={textSecondary} />
                         <Text style={[styles.reportText, { color: textSecondary }]}>Mark station as not working</Text>
                     </TouchableOpacity>
@@ -360,6 +356,7 @@ const styles = StyleSheet.create({
         width: '100%', marginBottom: SPACING.sm,
     },
     etaText: { ...TYPOGRAPHY.body, flex: 1 },
+
     stopBtn: {
         width: '100%', height: 68, borderRadius: BORDER_RADIUS.xl,
         borderWidth: 1.5, borderColor: COLORS.alertRed + '30',
