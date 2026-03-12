@@ -167,7 +167,7 @@ const B2CDashboard = () => {
 
             await createBooking({
                 connector_id: matchedConnector.connector_id,
-                vehicle_id: currentVehicleId || '',
+                vehicle_id: parseInt(currentVehicleId || '0', 10),
                 user_id: parseInt(DEFAULT_USER_ID, 10),
                 booking_time: now.toISOString(),
             });

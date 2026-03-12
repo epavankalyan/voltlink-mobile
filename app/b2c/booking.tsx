@@ -145,7 +145,7 @@ export default function B2CBooking() {
 
             await createBooking({
                 connector_id: selectedConnectorId || connector?.connector_id || '',
-                vehicle_id: currentVehicleId,
+                vehicle_id: parseInt(currentVehicleId || '0', 10),
                 user_id: DEFAULT_USER_ID,
                 booking_time: now.toISOString(),
             });

@@ -1,7 +1,7 @@
 export interface Booking {
     id: string;
     user_id: number;
-    vehicle_id: string;
+    vehicle_id: number;
     connector_id: string;
     booking_time: string;
     status: string;
@@ -18,7 +18,7 @@ export interface PaginatedResponse<T> {
 
 export interface CreateBookingRequest {
     user_id: number;
-    vehicle_id: string;
+    vehicle_id: number;
     connector_id: string;
     booking_time: string;
 }
