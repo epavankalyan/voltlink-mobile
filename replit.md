@@ -59,3 +59,7 @@ Configured for static deployment:
 - Babel config includes a custom plugin to handle Zustand 5+ `import.meta.env` on web
 - Web map uses Leaflet.js in an iframe (react-native-maps not used on web)
 - The app has role-based navigation guards in `_layout.tsx`
+- **Theme**: Dark mode is the only theme. The theme toggle has been removed from the profile/settings screens. The theme store always returns 'dark'.
+- **B2C Dashboard**: "All Stats" heading above metrics. CO₂ and Credits values formatted to 2 decimal places. "Find Charging Stations" CTA removed. "See All" in AI Recommendations has larger font.
+- **Booking flow**: Both B2C and Driver bookings auto-redirect to History screen after success. History shows "Open Session" and cancel buttons on all active/pending items.
+- **`vehicle_id`** must always be sent as integer (`parseInt`) in booking requests.

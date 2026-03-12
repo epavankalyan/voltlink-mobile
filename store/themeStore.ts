@@ -11,11 +11,15 @@ export const useThemeStore = create<ThemeState>()(
     persist(
         (set) => ({
             theme: 'dark',
-            toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+            toggleTheme: () => set({ theme: 'dark' }),
         }),
         {
             name: 'voltlink-theme-storage',
             storage: createJSONStorage(() => AsyncStorage),
+            merge: (_persistedState, currentState) => ({
+                ...currentState,
+                theme: 'dark' as const,
+            }),
         }
     )
 );

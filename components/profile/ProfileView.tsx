@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Switch, Alert, Modal, TextInput, Dimensions, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, Modal, TextInput, Dimensions, Platform } from 'react-native';
 const { width } = Dimensions.get('window');
-import { User, Shield, Info, LogOut, Moon, Sun, ChevronRight, Globe, Plus, Trash2, Leaf, Zap, Cloud, Trophy } from 'lucide-react-native';
+import { User, Shield, Info, LogOut, ChevronRight, Globe, Plus, Trash2, Leaf, Zap, Cloud, Trophy } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../ui/GlassCard';
 import { GlassButton } from '../ui/GlassButton';
@@ -21,7 +21,7 @@ interface ProfileViewProps {
 const RELATIONS = ['Spouse', 'Child', 'Parent', 'Sibling', 'Other'];
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) => {
-    const { theme, toggleTheme } = useThemeStore();
+    const { theme } = useThemeStore();
     const { switchRole, setRole } = useRoleStore();
     const { familyVehicles, fetchFamilyVehicles, addFamilyMemberApi, removeFamilyMemberApi } = useVehicleStore();
     const { language, setLanguage } = useLanguageStore();
@@ -173,19 +173,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ name, email, role }) =
                 {/* Preferences */}
                 <Text style={[styles.sectionTitle, { color: textSecondary }]}>PREFERENCES</Text>
                 <GlassCard style={[styles.menuCard, { borderColor }] as any} intensity={15}>
-                    <View style={[styles.menuItem, { borderBottomColor: borderColor }]}>
-                        <View style={styles.menuLeft}>
-                            {isDark ? <Moon size={20} color={COLORS.brandBlue} /> : <Sun size={20} color={COLORS.brandBlue} />}
-                            <Text style={[styles.menuText, { color: textPrimary }]}>Dark Mode</Text>
-                        </View>
-                        <Switch
-                            value={isDark}
-                            onValueChange={toggleTheme}
-                            trackColor={{ false: COLORS.darkTertiary, true: COLORS.brandBlue }}
-                            thumbColor="#FFF"
-                        />
-                    </View>
-
                     <View style={[styles.menuItem, { borderBottomColor: borderColor, flexDirection: 'column', alignItems: 'flex-start' }]}>
                         <View style={styles.menuLeft}>
                             <Globe size={20} color={COLORS.brandBlue} />

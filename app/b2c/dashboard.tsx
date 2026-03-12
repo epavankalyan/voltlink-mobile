@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, ScrollView, RefreshControl, Text, TouchableOpacity, Modal, TextInput, Platform, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    Wallet, Leaf, Zap, ChevronRight, Map, Plus, X, MapPin, Bot, User,
+    Wallet, Leaf, Zap, ChevronRight, Plus, X, MapPin, Bot, User,
     Car, BatteryCharging, Plug, IndianRupee, CalendarCheck, CheckCircle
 } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -256,16 +256,17 @@ const B2CDashboard = () => {
                     />
                 ) : null}
 
-                {/* Quick Stats */}
+                {/* All Stats */}
+                <Text style={[styles.allStatsTitle, { color: textSecondary }]}>All Stats</Text>
                 <View style={styles.statsRow}>
                     <MetricCard
                         label={t.credits}
-                        value={stats?.availableCredits || 0}
+                        value={Number(stats?.availableCredits ?? 0).toFixed(2)}
                         icon={<Wallet size={16} color={COLORS.brandBlue} />}
                     />
                     <MetricCard
                         label={t.co2Saved}
-                        value={`${stats?.carbonSavedKg || 0}`}
+                        value={Number(stats?.carbonSavedKg ?? 0).toFixed(2)}
                         unit="kg"
                         icon={<Leaf size={16} color={COLORS.successGreen} />}
                     />
@@ -286,7 +287,7 @@ const B2CDashboard = () => {
                                 <Text style={[styles.familyTitle, { color: textSecondary }]}>{t.aiRec}</Text>
                             </View>
                             <TouchableOpacity onPress={() => router.push('/b2c/discover' as any)}>
-                                <Text style={[styles.seeAllText, { color: COLORS.brandBlue }]}>See all</Text>
+                                <Text style={[styles.seeAllText, { color: COLORS.brandBlue }]}>See All</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -365,16 +366,7 @@ const B2CDashboard = () => {
                     </View>
                 )}
 
-                {/* Find Stations CTA */}
-                <TouchableOpacity
-                    style={styles.discoverCta}
-                    onPress={() => router.push('/b2c/discover' as any)}
-                    activeOpacity={0.85}
-                >
-                    <Map size={20} color={COLORS.brandBlue} />
-                    <Text style={styles.discoverText}>{t.findStations}</Text>
-                    <ChevronRight size={18} color={COLORS.brandBlue} />
-                </TouchableOpacity>
+                
             </ScrollView>
 
             {/* AI Simulation Modal */}
@@ -545,7 +537,8 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, gap: SPACING.sm,
     },
     discoverText: { ...TYPOGRAPHY.body, color: COLORS.brandBlue, flex: 1, fontWeight: '600' },
-    seeAllText: { ...TYPOGRAPHY.label, fontWeight: '700', fontSize: 12 },
+    seeAllText: { ...TYPOGRAPHY.body, fontWeight: '700', fontSize: 15 },
+    allStatsTitle: { ...TYPOGRAPHY.sectionHeader, fontSize: 18, fontWeight: '700', marginBottom: SPACING.sm, marginTop: SPACING.sm },
 
     aiSection: { marginBottom: SPACING.md },
     aiScroll: { gap: SPACING.sm, paddingBottom: SPACING.sm },
