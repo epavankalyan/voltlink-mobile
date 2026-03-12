@@ -25,6 +25,8 @@ type SessionItem = {
     rating: number;
     carbonSaved: number;
     connectorType: string;
+    connectorId?: string;
+    vehicleId?: string;
     status?: string;
     currentSoc?: number;
     isLive?: boolean;
@@ -95,7 +97,9 @@ export default function DriverHistory() {
                 cost: s.total_cost || 0,
                 rating: 0,
                 carbonSaved: s.carbon_saved_kg || 0,
-                connectorType: s.connector_id || s.connector?.connector_type || '',
+                connectorType: s.connector?.connector_type || s.connector_id || '',
+                connectorId: s.connector_id ? String(s.connector_id) : undefined,
+                vehicleId: s.vehicle_id ? String(s.vehicle_id) : undefined,
                 status: s.status || (source === 'booking' ? 'pending' : 'completed'),
                 currentSoc: s.current_soc,
                 isLive: s.is_live,
@@ -229,10 +233,14 @@ export default function DriverHistory() {
                     activeOpacity={0.8}
                     onPress={() => {
                         if (item.status === 'active' || item.status === 'pending') {
-                            router.push({
-                                pathname: '/driver/session',
-                                params: item.source === 'session' ? { sessionId: item.id } : {}
-                            });
+                            const params = item.source === 'session'
+                                ? { sessionId: item.id }
+                                : {
+                                    bookingId: item.id,
+                                    ...(item.connectorId ? { connectorId: item.connectorId } : {}),
+                                    ...(item.vehicleId ? { vehicleId: item.vehicleId } : {}),
+                                };
+                            router.push({ pathname: '/driver/session', params });
                         }
                     }}
                     style={{ padding: SPACING.md }}
@@ -298,10 +306,16 @@ export default function DriverHistory() {
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
-                                onPress={() => router.push({
-                                    pathname: '/driver/session',
-                                    params: item.source === 'session' ? { sessionId: item.id } : {}
-                                })}
+                                onPress={() => {
+                                    const params = item.source === 'session'
+                                        ? { sessionId: item.id }
+                                        : {
+                                            bookingId: item.id,
+                                            ...(item.connectorId ? { connectorId: item.connectorId } : {}),
+                                            ...(item.vehicleId ? { vehicleId: item.vehicleId } : {}),
+                                        };
+                                    router.push({ pathname: '/driver/session', params });
+                                }}
                             >
                                 <Play size={14} color={COLORS.successGreen} />
                                 <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>

@@ -13,7 +13,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { getVehicleActiveSession, startSession, stopSession, rateSession, getSession } from '../../services/session.service';
+import { createSession, getVehicleActiveSession, startSession, stopSession, rateSession, getSession } from '../../services/session.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -30,8 +30,14 @@ export default function SessionScreen() {
     const { currentVehicleId } = useVehicleStore();
     const isDark = theme === 'dark';
     const router = useRouter();
-    const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+    const { sessionId: initialSessionId, bookingId, connectorId: paramConnectorId, vehicleId: paramVehicleId } = useLocalSearchParams<{
+        sessionId?: string;
+        bookingId?: string;
+        connectorId?: string;
+        vehicleId?: string;
+    }>();
 
+    const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
     const { myVehicle } = useVehicleStore();
     const [chargePercent, setChargePercent] = useState(myVehicle?.batteryLevel ?? 20);
     const [isCharging, setIsCharging] = useState(false);
@@ -113,14 +119,27 @@ export default function SessionScreen() {
     const handleSlideEnd = async (e: any) => {
         if (e.nativeEvent.translationX > 180) {
             sliderPos.value = withTiming(320 - 56 - 16);
-            if (!sessionId) {
-                setIsCharging(true);
-                setChargePercent(myVehicle?.batteryLevel ?? 20);
-                return;
-            }
             setActionLoading(true);
             try {
-                await startSession(sessionId);
+                let activeSessionId = sessionId;
+                if (!activeSessionId && bookingId && paramConnectorId) {
+                    const vId = paramVehicleId ? parseInt(paramVehicleId, 10) : (currentVehicleId ? parseInt(String(currentVehicleId), 10) : (myVehicle?.id ? parseInt(String(myVehicle.id), 10) : 0));
+                    const created = await createSession({
+                        connector_id: paramConnectorId,
+                        vehicle_id: vId,
+                        user_id: parseInt(DEFAULT_USER_ID, 10),
+                        booking_id: parseInt(bookingId, 10),
+                    });
+                    activeSessionId = String(created.id);
+                    setSessionId(activeSessionId);
+                    setSessionData(created);
+                }
+                if (!activeSessionId) {
+                    setIsCharging(true);
+                    setChargePercent(myVehicle?.batteryLevel ?? 20);
+                    return;
+                }
+                await startSession(activeSessionId);
                 setIsCharging(true);
                 setChargePercent(myVehicle?.batteryLevel ?? 20);
             } catch (err) {

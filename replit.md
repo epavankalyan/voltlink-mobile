@@ -63,3 +63,5 @@ Configured for static deployment:
 - **B2C Dashboard**: "All Stats" heading above metrics. CO₂ and Credits values formatted to 2 decimal places. "Find Charging Stations" CTA removed. "See All" in AI Recommendations has larger font.
 - **Booking flow**: Both B2C and Driver bookings auto-redirect to History screen after success. History shows "Open Session" and cancel buttons on all active/pending items.
 - **`vehicle_id`** must always be sent as integer (`parseInt`) in booking requests.
+- **Session creation from booking**: `createSession` (POST /sessions) accepts `connector_id`, `vehicle_id`, `user_id`, and optional `booking_id`. History screens pass booking context (bookingId, connectorId, vehicleId) to session screens. When slider is used without an existing sessionId, session screens call createSession first, then startSession.
+- **Cancel flow**: B2C uses Modal for both booking and session cancel (web-compatible). Driver uses Modal with reason text for booking cancel, Alert for session stop.

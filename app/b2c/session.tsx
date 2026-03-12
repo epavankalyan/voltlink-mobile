@@ -14,7 +14,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { PanGestureHandler, GestureHandlerRootView, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
-import { startSession, stopSession, rateSession, getSession } from '../../services/session.service';
+import { createSession, startSession, stopSession, rateSession, getSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -29,8 +29,14 @@ export default function B2CSession() {
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
     const router = useRouter();
-    const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+    const { sessionId: initialSessionId, bookingId, connectorId: paramConnectorId, vehicleId: paramVehicleId } = useLocalSearchParams<{
+        sessionId?: string;
+        bookingId?: string;
+        connectorId?: string;
+        vehicleId?: string;
+    }>();
 
+    const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
     const { myVehicle } = useVehicleStore();
 
     const [chargePercent, setChargePercent] = useState(myVehicle?.batteryLevel ?? 20);
@@ -115,21 +121,33 @@ export default function B2CSession() {
     const handleSlideEnd = async (e: any) => {
         if (e.nativeEvent.translationX > 180) {
             sliderPos.value = withTiming(320 - 56 - 16);
-            if (!sessionId) {
-                // No session ID — just start simulation locally
-                setIsCharging(true);
-                setChargePercent(myVehicle?.batteryLevel ?? 20);
-                return;
-            }
             setActionLoading(true);
             try {
-                await startSession(sessionId);
+                let activeSessionId = sessionId;
+                if (!activeSessionId && bookingId && paramConnectorId) {
+                    const vId = paramVehicleId ? parseInt(paramVehicleId, 10) : (myVehicle?.id ? parseInt(String(myVehicle.id), 10) : 0);
+                    const created = await createSession({
+                        connector_id: paramConnectorId,
+                        vehicle_id: vId,
+                        user_id: parseInt(DEFAULT_USER_ID, 10),
+                        booking_id: parseInt(bookingId, 10),
+                    });
+                    activeSessionId = String(created.id);
+                    setSessionId(activeSessionId);
+                    setSessionData(created);
+                }
+                if (!activeSessionId) {
+                    setIsCharging(true);
+                    setChargePercent(myVehicle?.batteryLevel ?? 20);
+                    return;
+                }
+                await startSession(activeSessionId);
                 setIsCharging(true);
                 setChargePercent(myVehicle?.batteryLevel ?? 20);
             } catch (err) {
                 console.error('Start session error:', err);
                 Alert.alert('Error', 'Failed to start charging session. Please try again.');
-                sliderPos.value = withTiming(0); // reset slider
+                sliderPos.value = withTiming(0);
             } finally {
                 setActionLoading(false);
             }

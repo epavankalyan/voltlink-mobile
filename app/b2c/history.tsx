@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform, Linking, Modal } from 'react-native';
+import { StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform, Linking, Modal, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Clock, ThumbsUp, ThumbsDown, MapPin, CheckCircle, Info, XCircle, Play } from 'lucide-react-native';
+import { Zap, Clock, ThumbsUp, ThumbsDown, MapPin, CheckCircle, Info, XCircle, Play, AlertTriangle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
@@ -27,6 +27,7 @@ type HistoryItem = {
     rating?: number;
     status?: string;
     connectorId?: string;
+    vehicleId?: string;
     currentSoc?: number;
     isLive?: boolean;
     estimatedCompletion?: string;
@@ -42,6 +43,8 @@ export default function HistoryScreen() {
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [items, setItems] = useState<HistoryItem[]>([]);
+    const [cancelTarget, setCancelTarget] = useState<HistoryItem | null>(null);
+    const [cancelling, setCancelling] = useState(false);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
@@ -72,7 +75,8 @@ export default function HistoryScreen() {
                         type: 'Booking',
                         cost: b.total_cost,
                         kWh: b.kwh,
-                        connectorId: b.connector_id,
+                        connectorId: b.connector_id ? String(b.connector_id) : undefined,
+                        vehicleId: b.vehicle_id ? String(b.vehicle_id) : undefined,
                         currentSoc: b.current_soc,
                         source: 'booking' as const,
                         bookingTime: b.booking_time,
@@ -161,48 +165,40 @@ export default function HistoryScreen() {
 
     const handleCancel = (item: HistoryItem) => {
         if (item.source === 'session') {
-            Alert.alert(
-                'Stop Session',
-                'Are you sure you want to stop this charging session?',
-                [
-                    { text: 'No', style: 'cancel' },
-                    {
-                        text: 'Yes, Stop',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                await stopSession(String(item.id));
-                                fetchData(true);
-                            } catch (error) {
-                                console.error('Error stopping session:', error);
-                                Alert.alert('Error', 'Failed to stop session');
-                            }
-                        },
-                    },
-                ]
-            );
+            setCancelTarget(item);
         } else {
-            Alert.alert(
-                'Cancel Booking',
-                'Cancelling within 15 mins incurs a ₹20 penalty. Do you want to proceed?',
-                [
-                    { text: 'No', style: 'cancel' },
-                    {
-                        text: 'Yes, Cancel',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                await cancelBooking(String(item.id));
-                                fetchData(true);
-                            } catch (error) {
-                                console.error('Error cancelling booking:', error);
-                                Alert.alert('Error', 'Failed to cancel booking');
-                            }
-                        },
-                    },
-                ]
-            );
+            setCancelTarget(item);
         }
+    };
+
+    const submitCancel = async () => {
+        if (!cancelTarget) return;
+        setCancelling(true);
+        try {
+            if (cancelTarget.source === 'session') {
+                await stopSession(String(cancelTarget.id));
+            } else {
+                await cancelBooking(String(cancelTarget.id));
+            }
+            setCancelTarget(null);
+            fetchData(true);
+        } catch (error) {
+            console.error('Error cancelling:', error);
+            Alert.alert('Error', cancelTarget.source === 'session' ? 'Failed to stop session' : 'Failed to cancel booking');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const getSessionParams = (item: HistoryItem) => {
+        if (item.source === 'session') {
+            return { sessionId: item.id };
+        }
+        return {
+            bookingId: item.id,
+            ...(item.connectorId ? { connectorId: item.connectorId } : {}),
+            ...(item.vehicleId ? { vehicleId: item.vehicleId } : {}),
+        };
     };
 
     const renderItem = ({ item }: { item: HistoryItem }) => {
@@ -210,22 +206,7 @@ export default function HistoryScreen() {
             return (
                 <View style={{ marginBottom: SPACING.md }}>
                     <GlassCard style={{ ...(styles.bookingCard as any), padding: 0 }} intensity={25}>
-                        <TouchableOpacity
-                            style={{ position: 'absolute', right: SPACING.lg, top: SPACING.lg, zIndex: 10, padding: 4 }}
-                            onPress={() => handleCancel(item)}
-                        >
-                            <XCircle size={20} color={COLORS.alertRed} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                router.push({
-                                    pathname: '/b2c/session',
-                                    params: item.source === 'session' ? { sessionId: item.id } : {}
-                                });
-                            }}
-                            style={{ padding: SPACING.lg }}
-                        >
+                        <View style={{ padding: SPACING.lg }}>
                             <View style={styles.cardHeader}>
                                 <View style={[styles.iconBox, { backgroundColor: item.status === 'pending' ? COLORS.brandBlue + '20' : COLORS.successGreen + '20' }]}>
                                     <Zap size={18} color={item.status === 'pending' ? COLORS.brandBlue : COLORS.successGreen} />
@@ -234,6 +215,12 @@ export default function HistoryScreen() {
                                     <Text style={[styles.bookingTime, { color: textPrimary }]}>{item.time}</Text>
                                     <Text style={[styles.bookingStation, { color: textSecondary }]}>{item.station}</Text>
                                 </View>
+                                <TouchableOpacity
+                                    style={{ padding: 6 }}
+                                    onPress={() => handleCancel(item)}
+                                >
+                                    <XCircle size={20} color={COLORS.alertRed} />
+                                </TouchableOpacity>
                             </View>
 
                             <View style={styles.bookingDetails}>
@@ -257,14 +244,14 @@ export default function HistoryScreen() {
                                     style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
                                     onPress={() => router.push({
                                         pathname: '/b2c/session',
-                                        params: item.source === 'session' ? { sessionId: item.id } : {}
+                                        params: getSessionParams(item),
                                     })}
                                 >
                                     <Play size={14} color={COLORS.successGreen} />
                                     <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>
                                 </TouchableOpacity>
                             </View>
-                        </TouchableOpacity>
+                        </View>
                     </GlassCard>
                 </View>
             );
@@ -368,6 +355,50 @@ export default function HistoryScreen() {
                 />
             )}
 
+            <Modal
+                visible={cancelTarget !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setCancelTarget(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: isDark ? '#1a1a2e' : '#fff' }]}>
+                        <View style={[styles.modalIcon, { backgroundColor: COLORS.alertRed + '15' }]}>
+                            <AlertTriangle size={28} color={COLORS.alertRed} />
+                        </View>
+                        <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                            {cancelTarget?.source === 'session' ? 'Stop Session' : 'Cancel Booking'}
+                        </Text>
+                        <Text style={[styles.modalSub, { color: textSecondary }]}>
+                            {cancelTarget?.source === 'session'
+                                ? 'Are you sure you want to stop this charging session?'
+                                : 'Cancelling within 15 mins incurs a ₹20 penalty. Do you want to proceed?'}
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: COLORS.alertRed, borderColor: COLORS.alertRed }]}
+                                onPress={submitCancel}
+                                disabled={cancelling}
+                            >
+                                {cancelling ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={[styles.modalBtnText, { color: '#fff' }]}>
+                                        {cancelTarget?.source === 'session' ? 'Yes, Stop' : 'Yes, Cancel'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalCancel}
+                                onPress={() => setCancelTarget(null)}
+                            >
+                                <Text style={[styles.modalCancelText, { color: textSecondary }]}>Go Back</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
         </SafeAreaView>
     );

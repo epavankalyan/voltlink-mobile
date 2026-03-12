@@ -35,7 +35,16 @@ export const getStationSlots = async (
 // Session lifecycle
 // ---------------------------------------------------------------------------
 
-
+/**
+ * Create a new charging session, optionally linked to a booking.
+ * The backend will mark the booking as completed if booking_id is provided.
+ */
+export const createSession = async (data: {
+    connector_id: string;
+    vehicle_id: number;
+    user_id: number;
+    booking_id?: number;
+}) => apiClient.post('/sessions', data).then(res => res.data);
 
 
 /**
