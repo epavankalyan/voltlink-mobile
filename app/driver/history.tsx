@@ -12,6 +12,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getDriverSessions } from '../../services/driver.service';
 import { cancelBooking, getPendingBookings } from '../../services/booking.service';
+import { stopSession } from '../../services/session.service';
 import { format } from 'date-fns';
 
 type SessionItem = {
@@ -160,8 +161,31 @@ export default function DriverHistory() {
     };
 
     const handleCancelPress = (item: SessionItem) => {
-        setCancelTarget(item);
-        setCancelReason('');
+        if (item.source === 'session') {
+            Alert.alert(
+                'Stop Session',
+                'Are you sure you want to stop this charging session?',
+                [
+                    { text: 'No', style: 'cancel' },
+                    {
+                        text: 'Yes, Stop',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await stopSession(String(item.id));
+                                fetchSessions(true);
+                            } catch (error) {
+                                console.error('Error stopping session:', error);
+                                Alert.alert('Error', 'Failed to stop session');
+                            }
+                        },
+                    },
+                ]
+            );
+        } else {
+            setCancelTarget(item);
+            setCancelReason('');
+        }
     };
 
     const submitCancel = async () => {
@@ -192,7 +216,7 @@ export default function DriverHistory() {
         <View style={{ marginBottom: SPACING.sm }}>
             <GlassCard style={{ ...(styles.sessionCard as any), padding: 0 }} intensity={20}>
 
-                {item.source === 'booking' && (
+                {(item.status === 'active' || item.status === 'pending') && (
                     <TouchableOpacity
                         onPress={() => handleCancelPress(item)}
                         style={{ position: 'absolute', right: SPACING.lg, top: SPACING.md, zIndex: 10, padding: 4 }}
@@ -204,10 +228,10 @@ export default function DriverHistory() {
                 <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => {
-                        if (item.source === 'session') {
+                        if (item.status === 'active' || item.status === 'pending') {
                             router.push({
                                 pathname: '/driver/session',
-                                params: { sessionId: item.id }
+                                params: item.source === 'session' ? { sessionId: item.id } : {}
                             });
                         }
                     }}
@@ -223,7 +247,7 @@ export default function DriverHistory() {
                                 <Text style={[styles.sessionMetaText, { color: textSecondary }]}>{item.duration}</Text>
                             </View>
                         </View>
-                        {item.source === 'booking' ? (
+                        {(item.status === 'active' || item.status === 'pending') ? (
                             <View style={{ width: 45 }} />
                         ) : (
                             <Text style={[styles.sessionDate, { color: textSecondary }]}>{item.date}</Text>
@@ -272,18 +296,16 @@ export default function DriverHistory() {
                                 <MapPin size={14} color={COLORS.brandBlue} />
                                 <Text style={[styles.actionBtnText, { color: COLORS.brandBlue }]}>View Directions</Text>
                             </TouchableOpacity>
-                            {item.source === 'session' && (
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
-                                    onPress={() => router.push({
-                                        pathname: '/driver/session',
-                                        params: { sessionId: item.id }
-                                    })}
-                                >
-                                    <Play size={14} color={COLORS.successGreen} />
-                                    <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>
-                                </TouchableOpacity>
-                            )}
+                            <TouchableOpacity
+                                style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
+                                onPress={() => router.push({
+                                    pathname: '/driver/session',
+                                    params: item.source === 'session' ? { sessionId: item.id } : {}
+                                })}
+                            >
+                                <Play size={14} color={COLORS.successGreen} />
+                                <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>
+                            </TouchableOpacity>
                         </View>
                     )}
                 </TouchableOpacity>

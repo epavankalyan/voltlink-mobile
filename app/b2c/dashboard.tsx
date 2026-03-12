@@ -183,7 +183,7 @@ const B2CDashboard = () => {
                     setTimeout(() => {
                         setSimVisible(false);
                         setSimStep(0);
-                        router.push('/b2c/session' as any);
+                        router.push('/b2c/history' as any);
                     }, 2500);
                 }
                 step++;
@@ -457,10 +457,10 @@ const B2CDashboard = () => {
                                         <View style={{ flex: 1 }}>
                                             <Text style={[styles.successTitle, { color: textPrimary }]}>Success!</Text>
                                             <Text style={[styles.successSub, { color: textSecondary }]}>
-                                                Your booking at {simStation?.name} is confirmed and AI has initiated the session.
+                                                Your booking at {simStation?.name} is confirmed.
                                             </Text>
                                             <Text style={[styles.successSub, { color: textSecondary, marginTop: 12, fontStyle: 'italic' }]}>
-                                                Redirecting to session...
+                                                Redirecting to history...
                                             </Text>
                                         </View>
                                     </View>

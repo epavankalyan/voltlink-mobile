@@ -8,6 +8,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
 import { getUserSessions } from '../../services/b2c.service';
 import { cancelBooking, getPendingBookings } from '../../services/booking.service';
+import { stopSession } from '../../services/session.service';
 import { format } from 'date-fns';
 
 const TABS = ['Active', 'Past'];
@@ -159,26 +160,49 @@ export default function HistoryScreen() {
     };
 
     const handleCancel = (item: HistoryItem) => {
-        Alert.alert(
-            'Cancel Booking',
-            'Cancelling within 15 mins incurs a ₹20 penalty. Do you want to proceed?',
-            [
-                { text: 'No', style: 'cancel' },
-                {
-                    text: 'Yes, Cancel',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await cancelBooking(String(item.id));
-                            fetchData(true);
-                        } catch (error) {
-                            console.error('Error cancelling booking:', error);
-                            Alert.alert('Error', 'Failed to cancel booking');
-                        }
+        if (item.source === 'session') {
+            Alert.alert(
+                'Stop Session',
+                'Are you sure you want to stop this charging session?',
+                [
+                    { text: 'No', style: 'cancel' },
+                    {
+                        text: 'Yes, Stop',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await stopSession(String(item.id));
+                                fetchData(true);
+                            } catch (error) {
+                                console.error('Error stopping session:', error);
+                                Alert.alert('Error', 'Failed to stop session');
+                            }
+                        },
                     },
-                },
-            ]
-        );
+                ]
+            );
+        } else {
+            Alert.alert(
+                'Cancel Booking',
+                'Cancelling within 15 mins incurs a ₹20 penalty. Do you want to proceed?',
+                [
+                    { text: 'No', style: 'cancel' },
+                    {
+                        text: 'Yes, Cancel',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await cancelBooking(String(item.id));
+                                fetchData(true);
+                            } catch (error) {
+                                console.error('Error cancelling booking:', error);
+                                Alert.alert('Error', 'Failed to cancel booking');
+                            }
+                        },
+                    },
+                ]
+            );
+        }
     };
 
     const renderItem = ({ item }: { item: HistoryItem }) => {
@@ -186,23 +210,19 @@ export default function HistoryScreen() {
             return (
                 <View style={{ marginBottom: SPACING.md }}>
                     <GlassCard style={{ ...(styles.bookingCard as any), padding: 0 }} intensity={25}>
-                        {item.source === 'booking' && (
-                            <TouchableOpacity
-                                style={{ position: 'absolute', right: SPACING.lg, top: SPACING.lg, zIndex: 10, padding: 4 }}
-                                onPress={() => handleCancel(item)}
-                            >
-                                <XCircle size={20} color={COLORS.alertRed} />
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity
+                            style={{ position: 'absolute', right: SPACING.lg, top: SPACING.lg, zIndex: 10, padding: 4 }}
+                            onPress={() => handleCancel(item)}
+                        >
+                            <XCircle size={20} color={COLORS.alertRed} />
+                        </TouchableOpacity>
                         <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => {
-                                if (item.source === 'session') {
-                                    router.push({
-                                        pathname: '/b2c/session',
-                                        params: { sessionId: item.id }
-                                    });
-                                }
+                                router.push({
+                                    pathname: '/b2c/session',
+                                    params: item.source === 'session' ? { sessionId: item.id } : {}
+                                });
                             }}
                             style={{ padding: SPACING.lg }}
                         >
@@ -233,18 +253,16 @@ export default function HistoryScreen() {
                                     <MapPin size={14} color={COLORS.brandBlue} />
                                     <Text style={[styles.actionBtnText, { color: COLORS.brandBlue }]}>View Directions</Text>
                                 </TouchableOpacity>
-                                {item.source === 'session' && (
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
-                                        onPress={() => router.push({
-                                            pathname: '/b2c/session',
-                                            params: { sessionId: item.id }
-                                        })}
-                                    >
-                                        <Play size={14} color={COLORS.successGreen} />
-                                        <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>
-                                    </TouchableOpacity>
-                                )}
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, { borderColor: COLORS.successGreen }]}
+                                    onPress={() => router.push({
+                                        pathname: '/b2c/session',
+                                        params: item.source === 'session' ? { sessionId: item.id } : {}
+                                    })}
+                                >
+                                    <Play size={14} color={COLORS.successGreen} />
+                                    <Text style={[styles.actionBtnText, { color: COLORS.successGreen }]}>Open Session</Text>
+                                </TouchableOpacity>
                             </View>
                         </TouchableOpacity>
                     </GlassCard>
