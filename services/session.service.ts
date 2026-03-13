@@ -60,6 +60,21 @@ export const getSession = async (sessionId: string) =>
 export const stopSession = async (sessionId: string) =>
     apiClient.patch(`/sessions/${sessionId}/stop`).then(res => res.data);
 
+/**
+ * Get sessions filtered by vehicle_id and/or status.
+ * Uses GET /sessions?vehicle_id=X&status=active
+ */
+export const getSessionsByVehicle = async (
+    vehicleId: string | number,
+    status?: string,
+) => apiClient.get('/sessions', { params: { vehicle_id: vehicleId, status } })
+    .then(res => {
+        const d = res.data;
+        if (Array.isArray(d)) return d;
+        if (Array.isArray(d?.data)) return d.data;
+        return [];
+    });
+
 // ---------------------------------------------------------------------------
 // Active session polling
 // ---------------------------------------------------------------------------

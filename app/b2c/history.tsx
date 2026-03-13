@@ -9,7 +9,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getUserSessions } from '../../services/b2c.service';
 import { deleteBooking, getPendingBookings } from '../../services/booking.service';
-import { stopSession } from '../../services/session.service';
+import { stopSession, getSessionsByVehicle } from '../../services/session.service';
 import { format } from 'date-fns';
 
 const TABS = ['Active', 'Past'];
@@ -61,10 +61,15 @@ export default function HistoryScreen() {
                         console.error('[B2C] Failed to fetch pending bookings:', err?.response?.data || err?.message);
                         return [];
                     }),
-                    getUserSessions(undefined, 'active', forceRefresh).catch(err => {
-                        console.error('[B2C] Failed to fetch active sessions:', err?.response?.data || err?.message);
-                        return [];
-                    }),
+                    currentVehicleId
+                        ? getSessionsByVehicle(currentVehicleId, 'active').catch(err => {
+                            console.error('[B2C] Failed to fetch active sessions:', err?.response?.data || err?.message);
+                            return [];
+                        })
+                        : getUserSessions(undefined, 'active', forceRefresh).catch(err => {
+                            console.error('[B2C] Failed to fetch active sessions:', err?.response?.data || err?.message);
+                            return [];
+                        }),
                 ]);
 
                 const bookingItems: HistoryItem[] = (pendingBookings || []).map((b: any) => {
@@ -211,7 +216,7 @@ export default function HistoryScreen() {
         }
     };
 
-    const { myVehicle } = useVehicleStore();
+    const { myVehicle, currentVehicleId } = useVehicleStore();
 
     const getSessionParams = (item: HistoryItem) => {
         const bl = myVehicle?.batteryLevel != null ? String(myVehicle.batteryLevel) : undefined;

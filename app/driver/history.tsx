@@ -12,7 +12,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getDriverSessions } from '../../services/driver.service';
 import { deleteBooking, getPendingBookings } from '../../services/booking.service';
-import { stopSession } from '../../services/session.service';
+import { stopSession, getSessionsByVehicle } from '../../services/session.service';
 import { format } from 'date-fns';
 
 type SessionItem = {
@@ -117,10 +117,12 @@ export default function DriverHistory() {
                         console.error('[Driver] Failed to fetch pending bookings:', err?.response?.data || err?.message);
                         return [];
                     }),
-                    getDriverSessions(undefined, currentVehicleId || '', 'active', forceRefresh).catch(err => {
-                        console.error('[Driver] Failed to fetch active sessions:', err?.response?.data || err?.message);
-                        return [];
-                    }),
+                    currentVehicleId
+                        ? getSessionsByVehicle(currentVehicleId, 'active').catch(err => {
+                            console.error('[Driver] Failed to fetch active sessions:', err?.response?.data || err?.message);
+                            return [];
+                        })
+                        : Promise.resolve([]),
                     getDriverSessions(undefined, currentVehicleId || '', undefined, forceRefresh).catch(err => {
                         console.error('[Driver] Failed to fetch all sessions:', err?.response?.data || err?.message);
                         return [];
