@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, ScrollView, RefreshControl, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Route, DollarSign, AlertTriangle, User } from 'lucide-react-native';
+import { Zap, Route, AlertTriangle, User } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { VehicleCard } from '../../components/vehicle/VehicleCard';
 import { MetricCard } from '../../components/ui/MetricCard';
@@ -22,9 +22,9 @@ const translations = {
     English: {
         greeting: 'Good Morning,',
         stats: "Today's Stats",
+        efficiency: 'Efficiency',
         distance: 'Distance',
-        kwhUsed: 'kWh Used',
-        rate: 'Rate',
+        energyUsed: 'Energy Used',
         aiRecs: 'AI Recommendations',
         viewAll: 'View All',
         batteryLow: 'Battery critically low',
@@ -33,9 +33,9 @@ const translations = {
     'हिंदी': {
         greeting: 'शुभ प्रभात,',
         stats: "आज के आँकड़े",
+        efficiency: 'दक्षता',
         distance: 'दूरी',
-        kwhUsed: 'kWh उपयोग',
-        rate: 'दर',
+        energyUsed: 'ऊर्जा उपयोग',
         aiRecs: 'AI सिफारिशें',
         viewAll: 'सभी देखें',
         batteryLow: 'बैटरी बहुत कम है',
@@ -161,9 +161,9 @@ const DriverDashboard = () => {
 
                 <SectionHeader title={t.stats} />
                 <View style={styles.statsRow}>
+                    <MetricCard label={t.efficiency} value={stats?.kwhConsumed || 0} unit="km/kWh" icon={<Zap size={16} color={COLORS.brandBlue} />} />
                     <MetricCard label={t.distance} value={stats?.distanceKm || 0} unit="km" icon={<Route size={16} color={COLORS.brandBlue} />} />
-                    <MetricCard label={t.kwhUsed} value={stats?.kwhConsumed || 0} unit="kWh" icon={<Zap size={16} color={COLORS.brandBlue} />} />
-                    <MetricCard label={t.rate} value={`₹${stats?.costPerKwh || 0}`} unit="/kWh" icon={<DollarSign size={16} color={COLORS.brandBlue} />} />
+                    <MetricCard label={t.energyUsed} value="18.4" unit="kWh" icon={<Zap size={16} color={COLORS.successGreen} />} />
                 </View>
 
                 <SectionHeader

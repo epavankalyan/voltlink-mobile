@@ -169,7 +169,7 @@ export default function CreditsScreen() {
 
                 {/* ── Header ── */}
                 <View style={styles.header}>
-                    <Text style={[styles.title, { color: textPrimary }]}>Energy Credits</Text>
+                    <Text style={[styles.title, { color: textPrimary }]}>Credit Balance</Text>
                     <Text style={[styles.subtitle, { color: textSecondary }]}>
                         Track energy credits by source, view transaction history, and transfer credits.
                     </Text>

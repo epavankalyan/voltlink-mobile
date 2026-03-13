@@ -27,9 +27,9 @@ const translations = {
         welcome: 'Welcome back,',
         familyVehicles: 'FAMILY VEHICLES',
         add: 'Add',
-        credits: 'Credits',
-        co2Saved: 'CO₂ Saved',
         sessions: 'Sessions',
+        co2Saved: 'CO₂ Saved',
+        creditsEarned: 'Credits Earned',
         availableCredits: 'Available Credits',
         viewHistory: 'View transaction history',
         findStations: 'Find Charging Stations Near You',
@@ -48,9 +48,9 @@ const translations = {
         welcome: 'वापसी पर स्वागत है,',
         familyVehicles: 'पारिवारिक वाहन',
         add: 'जोड़ें',
-        credits: 'क्रेडिट',
-        co2Saved: 'CO₂ बचत',
         sessions: 'सत्र',
+        co2Saved: 'CO₂ बचत',
+        creditsEarned: 'अर्जित क्रेडिट',
         availableCredits: 'उपलब्ध क्रेडिट',
         viewHistory: 'लेन-देन का इतिहास देखें',
         findStations: 'अपने पास चार्जिंग स्टेशन खोजें',
@@ -266,13 +266,13 @@ const B2CDashboard = () => {
                     />
                 ) : null}
 
-                {/* All Stats */}
-                <Text style={[styles.allStatsTitle, { color: textSecondary }]}>All Stats</Text>
+                {/* Charging Stats */}
+                <Text style={[styles.allStatsTitle, { color: textSecondary }]}>Charging Stats</Text>
                 <View style={styles.statsRow}>
                     <MetricCard
-                        label={t.credits}
-                        value={Number(stats?.availableCredits ?? 0).toFixed(2)}
-                        icon={<Wallet size={16} color={COLORS.brandBlue} />}
+                        label={t.sessions}
+                        value={stats?.totalSessions || 0}
+                        icon={<Zap size={16} color={COLORS.brandBlue} />}
                     />
                     <MetricCard
                         label={t.co2Saved}
@@ -281,9 +281,9 @@ const B2CDashboard = () => {
                         icon={<Leaf size={16} color={COLORS.successGreen} />}
                     />
                     <MetricCard
-                        label={t.sessions}
-                        value={stats?.totalSessions || 0}
-                        icon={<Zap size={16} color={COLORS.brandBlue} />}
+                        label={t.creditsEarned}
+                        value={Number(stats?.availableCredits ?? 0).toFixed(2)}
+                        icon={<Wallet size={16} color={COLORS.brandBlue} />}
                     />
                 </View>
 
