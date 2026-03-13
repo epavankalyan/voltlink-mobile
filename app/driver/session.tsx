@@ -13,7 +13,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
-import { createSession, getVehicleActiveSession, startSession, stopSession, rateSession, getSession } from '../../services/session.service';
+import { createSession, getVehicleActiveSession, stopSession, rateSession, getSession } from '../../services/session.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -156,16 +156,6 @@ export default function SessionScreen() {
                             endpoint: 'POST /sessions',
                             payload: { connector_id: paramConnectorId, booking_id: bookingId },
                             error: createErr?.response?.data || createErr?.message,
-                        });
-                    }
-                }
-                if (activeSessionId) {
-                    try {
-                        await startSession(activeSessionId);
-                    } catch (startErr: any) {
-                        console.error('[Driver] startSession API failed. Starting local charging simulation.', {
-                            endpoint: `PATCH /sessions/${activeSessionId}/start`,
-                            error: startErr?.response?.data || startErr?.message,
                         });
                     }
                 }

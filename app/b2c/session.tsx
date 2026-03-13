@@ -14,7 +14,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { PanGestureHandler, GestureHandlerRootView, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
-import { createSession, startSession, stopSession, rateSession, getSession } from '../../services/session.service';
+import { createSession, stopSession, rateSession, getSession } from '../../services/session.service';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const SIZE = 220;
@@ -157,16 +157,6 @@ export default function B2CSession() {
                             endpoint: 'POST /sessions',
                             payload: { connector_id: paramConnectorId, booking_id: bookingId },
                             error: createErr?.response?.data || createErr?.message,
-                        });
-                    }
-                }
-                if (activeSessionId) {
-                    try {
-                        await startSession(activeSessionId);
-                    } catch (startErr: any) {
-                        console.error('[B2C] startSession API failed. Starting local charging simulation.', {
-                            endpoint: `PATCH /sessions/${activeSessionId}/start`,
-                            error: startErr?.response?.data || startErr?.message,
                         });
                     }
                 }

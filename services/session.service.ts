@@ -55,12 +55,6 @@ export const getSession = async (sessionId: string) =>
     apiClient.get(`/sessions/${sessionId}`).then(res => res.data);
 
 /**
- * Start a charging session (called when the user slides the slider).
- */
-export const startSession = async (sessionId: string) =>
-    apiClient.patch(`/sessions/${sessionId}/start`).then(res => res.data);
-
-/**
  * Stop an active charging session.
  */
 export const stopSession = async (sessionId: string) =>
