@@ -18,7 +18,7 @@ import { createBooking } from '../../services/booking.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getStationById } from '../../services/stations.service';
 
-const DEFAULT_USER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11', 10);
+const DEFAULT_USER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '5', 10);
 
 export default function B2CBooking() {
     const { theme } = useThemeStore();
@@ -46,6 +46,13 @@ export default function B2CBooking() {
             }, 50);
         }
     }, [confirmed]);
+
+    useEffect(() => {
+        setConfirmed(false);
+        setSubmitting(false);
+        setTaskStep(0);
+        setSelectedSlot(null);
+    }, [params.stationId]);
 
     useEffect(() => {
         if (confirmed && taskStep > 0 && scrollRef.current) {
@@ -161,12 +168,15 @@ export default function B2CBooking() {
                     clearInterval(interval);
                     // Auto-navigate to history after a short delay
                     setTimeout(() => {
-                        router.replace('/b2c/history');
+                        router.replace({
+                            pathname: '/b2c/history',
+                            params: { refresh: Date.now().toString(), tab: 'Active' }
+                        });
                     }, 2000);
                 }
                 step++;
             }, 1000); // 1s per step for better visibility
-            setSubmitting(false); // Reset in case of future use, though we switch views
+            setSubmitting(false); // Reset to allow future bookings
         } catch (error: any) {
             setSubmitting(false);
             console.error('Booking confirmation fatal error:', error);
@@ -178,7 +188,10 @@ export default function B2CBooking() {
     useEffect(() => {
         if (confirmed && !isAI) {
             const timer = setTimeout(() => {
-                router.replace('/b2c/history');
+                router.replace({
+                    pathname: '/b2c/history',
+                    params: { refresh: Date.now().toString(), tab: 'Active' }
+                });
             }, 1500);
             return () => clearTimeout(timer);
         }

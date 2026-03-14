@@ -193,7 +193,10 @@ const B2CDashboard = () => {
                     setTimeout(() => {
                         setSimVisible(false);
                         setSimStep(0);
-                        router.push('/b2c/history' as any);
+                        router.replace({
+                            pathname: '/b2c/history',
+                            params: { refresh: Date.now().toString(), tab: 'Active' }
+                        });
                     }, 2500);
                 }
                 step++;
@@ -376,7 +379,7 @@ const B2CDashboard = () => {
                     </View>
                 )}
 
-                
+
             </ScrollView>
 
             {/* AI Simulation Modal */}

@@ -22,7 +22,7 @@ const STROKE = 16;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
+const DEFAULT_DRIVER_ID = process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4';
 const POLL_INTERVAL = Number(process.env.EXPO_PUBLIC_SESSION_POLL_INTERVAL ?? 30000); // Default to 30 seconds
 
 export default function SessionScreen() {
@@ -144,7 +144,7 @@ export default function SessionScreen() {
                         const created = await createSession({
                             connector_id: paramConnectorId,
                             vehicle_id: vId,
-                            user_id: parseInt(DEFAULT_USER_ID, 10),
+                            user_id: parseInt(DEFAULT_DRIVER_ID, 10),
                             booking_id: bookingId,
                             session_type: 'charging',
                         });
@@ -202,7 +202,17 @@ export default function SessionScreen() {
         if (actionLoading) return;
         setActionLoading(true);
         try {
-            if (sessionId) await stopSession(sessionId);
+            if (sessionId) {
+                const result = await stopSession(sessionId);
+                // Use the real metrics from the Stop API response
+                if (result) {
+                    setSessionData(result);
+                    if (result.current_soc) {
+                        setChargePercent(result.current_soc);
+                        progress.value = result.current_soc / 100;
+                    }
+                }
+            }
         } catch (err: any) {
             console.error('[Driver] stopSession API failed. Stopping locally.', {
                 endpoint: `PATCH /sessions/${sessionId}/stop`,

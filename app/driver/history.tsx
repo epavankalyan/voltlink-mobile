@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator, Alert, Platform, Linking, Modal
+    StyleSheet, View, FlatList, Text, TouchableOpacity, Pressable, ActivityIndicator, Alert, Platform, Linking, Modal, TextInput
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, MapPin, ThumbsUp, ThumbsDown, CheckCircle, XCircle, Info, Calendar, Play, AlertTriangle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -10,8 +10,10 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { useThemeStore } from '../../store/themeStore';
 import { useVehicleStore } from '../../store/vehicleStore';
+import { apiClient } from '../../services/api.service';
 import { getDriverSessions } from '../../services/driver.service';
-import { deleteBooking, getPendingBookings } from '../../services/booking.service';
+import { getUserSessions } from '../../services/b2c.service';
+import { cancelBooking, deleteBooking, getPendingBookings } from '../../services/booking.service';
 import { stopSession, getSessionsByVehicle } from '../../services/session.service';
 import { format } from 'date-fns';
 
@@ -43,19 +45,39 @@ const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'active', label: 'Active' },
 ];
 
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
+const DEFAULT_DRIVER_ID = process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4';
 
 export default function DriverHistory() {
     const router = useRouter();
     const { theme } = useThemeStore();
     const { currentVehicleId, myVehicle } = useVehicleStore();
     const isDark = theme === 'dark';
-    const [filter, setFilter] = useState<FilterKey>('active');
+    const params = useLocalSearchParams<{ refresh?: string, filter?: FilterKey }>();
+    const [filter, setFilter] = useState<FilterKey>((params.filter as FilterKey) || 'active');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [allSessions, setAllSessions] = useState<SessionItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<SessionItem | null>(null);
+    const [cancelReason, setCancelReason] = useState('');
     const [cancelling, setCancelling] = useState(false);
+
+    // Update filter if params change
+    useEffect(() => {
+        if (params.filter) {
+            setFilter(params.filter as FilterKey);
+        }
+    }, [params.filter, params.refresh]);
+
+    // Polling for active sessions
+    useEffect(() => {
+        let interval: any;
+        if (filter === 'active') {
+            interval = setInterval(() => {
+                fetchSessions(true);
+            }, 10000); // Poll every 10 seconds for active bookings/sessions
+        }
+        return () => clearInterval(interval);
+    }, [filter, currentVehicleId]);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
@@ -65,11 +87,8 @@ export default function DriverHistory() {
     const mapSessions = (data: any[], source: 'session' | 'booking' = 'session'): SessionItem[] =>
         (data || []).map((s: any) => {
             let duration = 'N/A';
-            if (s.elapsed_seconds) {
-                const totalMins = Math.round(s.elapsed_seconds / 60);
-                const hrs = Math.floor(totalMins / 60);
-                const mins = totalMins % 60;
-                duration = hrs > 0 ? `${hrs}h ${mins}m` : `${totalMins}m`;
+            if (s.elapsed_seconds !== undefined && s.elapsed_seconds !== null) {
+                duration = `${s.elapsed_seconds}`;
             } else if (s.start_time && s.end_time) {
                 const mins = Math.round((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000);
                 const hrs = Math.floor(mins / 60);
@@ -110,10 +129,13 @@ export default function DriverHistory() {
 
     const fetchSessions = async (forceRefresh: boolean = false) => {
         setLoading(true);
+        // Clear sessions to ensure no stale data or duplicates are shown while loading
+        setSessions([]);
         try {
-            if (filter === 'active' || filter === 'all') {
-                const [pendingBookings, activeSessions, allData] = await Promise.all([
-                    getPendingBookings(DEFAULT_USER_ID, forceRefresh).catch(err => {
+            if (filter === 'active') {
+                // Fetch only pending bookings and active sessions
+                const [pendingBookings, activeSessions] = await Promise.all([
+                    getPendingBookings(DEFAULT_DRIVER_ID, forceRefresh).catch(err => {
                         console.error('[Driver] Failed to fetch pending bookings:', err?.response?.data || err?.message);
                         return [];
                     }),
@@ -123,48 +145,49 @@ export default function DriverHistory() {
                             return [];
                         })
                         : Promise.resolve([]),
-                    getDriverSessions(undefined, currentVehicleId || '', undefined, forceRefresh).catch(err => {
-                        console.error('[Driver] Failed to fetch all sessions:', err?.response?.data || err?.message);
-                        return [];
-                    }),
                 ]);
 
                 const bookingItems = mapSessions(pendingBookings, 'booking');
                 const activeItems = mapSessions(activeSessions, 'session');
-                const allItems = mapSessions(allData);
-
-                if (filter === 'active') {
-                    const merged = [...bookingItems, ...activeItems];
-                    merged.sort((a, b) => {
-                        const tA = a.bookingTime ? new Date(a.bookingTime).getTime() : 0;
-                        const tB = b.bookingTime ? new Date(b.bookingTime).getTime() : 0;
-                        return tB - tA;
-                    });
-                    setSessions(merged);
-                } else {
-                    const activeIds = new Set([...bookingItems, ...activeItems].map(i => i.id));
-                    const completedItems = allItems.filter(i => !activeIds.has(i.id));
-                    const sortedActive = [...bookingItems, ...activeItems].sort((a, b) => {
-                        const tA = a.bookingTime ? new Date(a.bookingTime).getTime() : 0;
-                        const tB = b.bookingTime ? new Date(b.bookingTime).getTime() : 0;
-                        return tB - tA;
-                    });
-                    setSessions([...sortedActive, ...completedItems]);
-                }
-                setAllSessions(allItems);
+                const merged = [...bookingItems, ...activeItems];
+                merged.sort((a, b) => {
+                    const tA = a.bookingTime ? new Date(a.bookingTime).getTime() : 0;
+                    const tB = b.bookingTime ? new Date(b.bookingTime).getTime() : 0;
+                    return tB - tA;
+                });
+                setSessions(merged);
+            } else if (filter === 'completed') {
+                // Fetch only completed sessions from backend (user-centric for reliability)
+                const completedSessions = await getUserSessions(DEFAULT_DRIVER_ID, 'completed', forceRefresh).catch(err => {
+                    console.error('[Driver] Failed to fetch completed sessions:', err?.response?.data || err?.message);
+                    return [];
+                });
+                setSessions(mapSessions(completedSessions));
             } else {
-                const [filtered, all] = await Promise.all([
-                    getDriverSessions(undefined, currentVehicleId || '', filter, forceRefresh).catch(err => {
-                        console.error('[Driver] Failed to fetch sessions:', err?.response?.data || err?.message);
-                        return [];
-                    }),
-                    getDriverSessions(undefined, currentVehicleId || '', undefined, forceRefresh).catch(err => {
-                        console.error('[Driver] Failed to fetch all sessions:', err?.response?.data || err?.message);
-                        return [];
-                    }),
+                // "All" Tab: Fetch everything, prioritize active/pending
+                const [pendingBookings, activeSessions, allSessionsData] = await Promise.all([
+                    getPendingBookings(DEFAULT_DRIVER_ID, forceRefresh).catch(() => []),
+                    currentVehicleId ? getSessionsByVehicle(currentVehicleId, 'active').catch(() => []) : Promise.resolve([]),
+                    getUserSessions(DEFAULT_DRIVER_ID, undefined, forceRefresh).catch(() => []),
                 ]);
-                setSessions(mapSessions(filtered));
-                setAllSessions(mapSessions(all));
+
+                const bookingItems = mapSessions(pendingBookings, 'booking');
+                const activeItems = mapSessions(activeSessions, 'session');
+                const allItems = mapSessions(allSessionsData);
+
+                const activeIds = new Set([...bookingItems, ...activeItems].map(i => i.id));
+                const sortedActive = [...bookingItems, ...activeItems].sort((a, b) => {
+                    const tA = a.bookingTime ? new Date(a.bookingTime).getTime() : 0;
+                    const tB = b.bookingTime ? new Date(b.bookingTime).getTime() : 0;
+                    return tB - tA;
+                });
+
+                // Filter out any sessions that are already showing as active/pending to avoid duplicates
+                const completedItems = allItems.filter(i => i.status === 'completed' && !activeIds.has(i.id));
+
+                // Active and pending sessions MUST appear first, followed by completed sessions
+                setSessions([...sortedActive, ...completedItems]);
+                setAllSessions(allItems);
             }
         } catch (error: any) {
             console.error('[Driver] Error loading history:', error?.response?.data || error?.message);
@@ -179,6 +202,7 @@ export default function DriverHistory() {
 
     useFocusEffect(
         React.useCallback(() => {
+            // Always fetch fresh data from API when navigating to this screen
             fetchSessions(true);
         }, [filter])
     );
@@ -190,17 +214,24 @@ export default function DriverHistory() {
 
     const handleCancelPress = (item: SessionItem) => {
         setCancelTarget(item);
+        setCancelReason(''); // Reset reason
     };
 
     const submitCancel = async () => {
         if (!cancelTarget) return;
+
+        if (!cancelReason.trim()) {
+            Alert.alert('Reason Required', 'Please provide a reason for cancellation.');
+            return;
+        }
+
         setCancelling(true);
         let apiFailed = false;
         try {
             if (cancelTarget.source === 'session') {
                 await stopSession(String(cancelTarget.id));
             } else {
-                await deleteBooking(String(cancelTarget.id));
+                await cancelBooking(String(cancelTarget.id), { reason: cancelReason });
             }
         } catch (error: any) {
             apiFailed = true;
@@ -414,16 +445,38 @@ export default function DriverHistory() {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: isDark ? '#1a1a2e' : '#fff' }]}>
                         <View style={[styles.modalIcon, { backgroundColor: COLORS.alertRed + '15' }]}>
-                            <AlertTriangle size={28} color={COLORS.alertRed} />
+                            <XCircle size={32} color={COLORS.alertRed} />
                         </View>
                         <Text style={[styles.modalTitle, { color: textPrimary }]}>
                             {cancelTarget?.source === 'session' ? 'Stop Session' : 'Cancel Booking'}
                         </Text>
-                        <Text style={[styles.modalSub, { color: textSecondary }]}>
+                        <Text style={[styles.modalSub, { color: textSecondary, marginBottom: SPACING.md }]}>
                             {cancelTarget?.source === 'session'
                                 ? 'Are you sure you want to stop this charging session?'
-                                : 'Are you sure you want to cancel this booking?'}
+                                : 'Please provide a reason for cancelling this booking.'}
                         </Text>
+
+                        {cancelTarget?.source === 'booking' && (
+                            <TextInput
+                                style={{
+                                    width: '100%',
+                                    height: 80,
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                    borderRadius: BORDER_RADIUS.md,
+                                    padding: SPACING.md,
+                                    color: textPrimary,
+                                    textAlignVertical: 'top',
+                                    marginBottom: SPACING.lg,
+                                    borderWidth: 1,
+                                    borderColor: borderColor,
+                                }}
+                                placeholder="Reason for cancellation..."
+                                placeholderTextColor={COLORS.textMutedDark}
+                                multiline
+                                value={cancelReason}
+                                onChangeText={setCancelReason}
+                            />
+                        )}
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
@@ -438,13 +491,14 @@ export default function DriverHistory() {
                                     <ActivityIndicator color="#fff" size="small" />
                                 ) : (
                                     <Text style={[styles.modalBtnText, { color: '#fff' }]}>
-                                        {cancelTarget?.source === 'session' ? 'Yes, Stop' : 'Yes, Cancel'}
+                                        {cancelTarget?.source === 'session' ? 'Yes, Stop' : 'Confirm Cancellation'}
                                     </Text>
                                 )}
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.modalCancel}
                                 onPress={() => setCancelTarget(null)}
+                                disabled={cancelling}
                             >
                                 <Text style={[styles.modalCancelText, { color: textSecondary }]}>Go Back</Text>
                             </TouchableOpacity>

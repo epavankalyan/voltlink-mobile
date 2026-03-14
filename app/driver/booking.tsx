@@ -14,7 +14,7 @@ import { createBooking } from '../../services/booking.service';
 import { useVehicleStore } from '../../store/vehicleStore';
 import { getStationById, getAIRecommendations } from '../../services/stations.service';
 
-const DEFAULT_USER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11', 10);
+const DEFAULT_DRIVER_ID = parseInt(process.env.EXPO_PUBLIC_DEFAULT_DRIVER_ID ?? '4', 10);
 
 export default function DriverBooking() {
     const { theme } = useThemeStore();
@@ -89,6 +89,13 @@ export default function DriverBooking() {
         fetchData();
     }, [params.stationId, rank, currentVehicleId]);
 
+    useEffect(() => {
+        setConfirmed(false);
+        setSubmitting(false);
+        setShowReasonScreen(false);
+        setReason('');
+    }, [params.stationId, rank]);
+
     // Auto-confirm if rank=1 and slot is selected
     useEffect(() => {
         if (rank === '1' && !loading && !confirmed && !submitting && selectedSlot && station) {
@@ -112,14 +119,8 @@ export default function DriverBooking() {
             return;
         }
 
-        // If rank=2 and not yet showing reason screen, show it first
-        if (rank === '2' && !showReasonScreen) {
-            setShowReasonScreen(true);
-            return;
-        }
-
-        // If showing reason screen but reason is empty, alert
-        if (showReasonScreen && !reason.trim()) {
+        // If rank=2 and reason is empty, alert (though button should be disabled)
+        if (rank === '2' && !reason.trim()) {
             Alert.alert('Reason Required', 'Please provide a reason for choosing this station.');
             return;
         }
@@ -148,16 +149,21 @@ export default function DriverBooking() {
             await createBooking({
                 connector_id: selectedConnectorId || connector?.connector_id || '',
                 vehicle_id: parseInt(currentVehicleId || '0', 10),
-                user_id: DEFAULT_USER_ID,
+                user_id: DEFAULT_DRIVER_ID,
                 booking_time: now.toISOString(),
             });
             setConfirmed(true);
+            setSubmitting(false); // Reset to allow future bookings
             setTimeout(() => {
-                router.replace('/driver/history');
-            }, 1800);
+                router.replace({
+                    pathname: '/driver/history',
+                    params: { refresh: Date.now().toString(), filter: 'active' }
+                });
+            }, 1500);
         } catch (error) {
             console.error('Error creating session:', error);
             Alert.alert('Error', 'Failed to start session. Please try again.');
+            setSubmitting(false); // Reset submitting on error
         }
     };
 
@@ -169,6 +175,7 @@ export default function DriverBooking() {
         );
     }
 
+
     if (confirmed) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: bg, justifyContent: 'center', alignItems: 'center' }]}>
@@ -177,73 +184,6 @@ export default function DriverBooking() {
                 <Text style={[styles.confirmedSub, { color: textSecondary, marginTop: 12 }]}>
                     Redirecting to History Screen...
                 </Text>
-            </SafeAreaView>
-        );
-    }
-
-    if (showReasonScreen) {
-        const lossPrice = (station?.pricePerKwh ?? 0) - (firstRecommendation?.pricePerKwh ?? 0);
-        const lossDist = (station?.distanceKm ?? 0) - (firstRecommendation?.distanceKm ?? 0);
-
-        return (
-            <SafeAreaView style={[styles.container, { backgroundColor: bg }]} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => setShowReasonScreen(false)} style={styles.backBtn}>
-                        <ArrowLeft size={24} color={textPrimary} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: textPrimary }]}>Confirmation</Text>
-                    <View style={{ width: 40 }} />
-                </View>
-
-                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                    <Text style={[styles.reasonTitle, { color: textPrimary }]}>
-                        Why did you choose the second recommendation instead of the first?
-                    </Text>
-
-                    <GlassCard style={styles.lossCard as any} intensity={15}>
-                        <Text style={[styles.lossHeader, { color: COLORS.alertRed }]}>Potential Loss Summary</Text>
-
-                        <View style={styles.lossItem}>
-                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Higher Price</Text>
-                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+₹{lossPrice > 0 ? lossPrice.toFixed(2) : '0.00'}/kWh</Text>
-                        </View>
-
-                        <View style={styles.lossItem}>
-                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Further Distance</Text>
-                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+{lossDist > 0 ? lossDist.toFixed(1) : '0.0'} km</Text>
-                        </View>
-
-                        <View style={styles.lossItem}>
-                            <Text style={[styles.lossLabel, { color: textSecondary }]}>Longer Wait</Text>
-                            <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+15 min</Text>
-                        </View>
-                    </GlassCard>
-
-                    <Text style={[styles.sectionLabel, { color: textSecondary, marginTop: SPACING.xl }]}>Reason for Selection</Text>
-                    <TextInput
-                        style={[styles.reasonInput, { color: textPrimary, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: borderColor }]}
-                        placeholder="Enter your reason here..."
-                        placeholderTextColor={textSecondary}
-                        multiline
-                        numberOfLines={4}
-                        value={reason}
-                        onChangeText={setReason}
-                    />
-
-                    <TouchableOpacity
-                        style={[styles.confirmBtn, { backgroundColor: reason.trim() ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }]}
-                        onPress={handleConfirm}
-                        disabled={submitting}
-                    >
-                        {submitting ? (
-                            <ActivityIndicator color="#000" />
-                        ) : (
-                            <Text style={[styles.confirmText, { color: reason.trim() ? '#000' : textSecondary }]}>
-                                Confirm and Book
-                            </Text>
-                        )}
-                    </TouchableOpacity>
-                </ScrollView>
             </SafeAreaView>
         );
     }
@@ -282,7 +222,45 @@ export default function DriverBooking() {
                 </GlassCard>
 
                 {/* Driver Booking: Slots and Estimates are hidden to streamline flow */}
-                <View style={{ height: 10 }} />
+                {/* Reason & Potential Loss for second recommendation */}
+                {rank === '2' && (
+                    <View style={{ marginBottom: SPACING.lg }}>
+                        <Text style={[styles.reasonTitle, { color: textPrimary, fontSize: 18, marginBottom: SPACING.md }]}>
+                            Why choose this instead of #1?
+                        </Text>
+
+                        <GlassCard style={styles.lossCard as any} intensity={15}>
+                            <Text style={[styles.lossHeader, { color: COLORS.alertRed }]}>Potential Loss Summary</Text>
+                            <View style={styles.lossItem}>
+                                <Text style={[styles.lossLabel, { color: textSecondary }]}>Higher Price</Text>
+                                <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>
+                                    +₹{((station?.pricePerKwh ?? 0) - (firstRecommendation?.pricePerKwh ?? 0) > 0) ? ((station?.pricePerKwh ?? 0) - (firstRecommendation?.pricePerKwh ?? 0)).toFixed(2) : '0.00'}/kWh
+                                </Text>
+                            </View>
+                            <View style={styles.lossItem}>
+                                <Text style={[styles.lossLabel, { color: textSecondary }]}>Further Distance</Text>
+                                <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>
+                                    +{((station?.distanceKm ?? 0) - (firstRecommendation?.distanceKm ?? 0) > 0) ? ((station?.distanceKm ?? 0) - (firstRecommendation?.distanceKm ?? 0)).toFixed(1) : '0.0'} km
+                                </Text>
+                            </View>
+                            <View style={styles.lossItem}>
+                                <Text style={[styles.lossLabel, { color: textSecondary }]}>Longer Wait</Text>
+                                <Text style={[styles.lossValue, { color: COLORS.alertRed }]}>+15 min</Text>
+                            </View>
+                        </GlassCard>
+
+                        <Text style={[styles.sectionLabel, { color: textSecondary, marginTop: SPACING.lg }]}>Reason for Selection</Text>
+                        <TextInput
+                            style={[styles.reasonInput, { color: textPrimary, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderColor: borderColor }]}
+                            placeholder="Enter your reason here..."
+                            placeholderTextColor={textSecondary}
+                            multiline
+                            numberOfLines={4}
+                            value={reason}
+                            onChangeText={setReason}
+                        />
+                    </View>
+                )}
 
                 <GlassCard style={styles.stationCard as any} intensity={15}>
                     <Text style={[styles.sectionLabel, { color: textSecondary, marginTop: 0 }]}>Booking Details</Text>
@@ -307,11 +285,15 @@ export default function DriverBooking() {
                     <TouchableOpacity
                         style={[
                             styles.confirmBtn,
-                            { backgroundColor: selectedSlot ? COLORS.brandBlue : 'rgba(255,255,255,0.1)' }
+                            {
+                                backgroundColor: (selectedSlot && (rank !== '2' || reason.trim().length > 0))
+                                    ? COLORS.brandBlue
+                                    : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)')
+                            }
                         ]}
                         onPress={handleConfirm}
                         activeOpacity={0.85}
-                        disabled={submitting}
+                        disabled={submitting || !selectedSlot || (rank === '2' && !reason.trim())}
                     >
                         {submitting ? (
                             <ActivityIndicator color="#000" />
@@ -320,7 +302,7 @@ export default function DriverBooking() {
                                 styles.confirmText,
                                 { color: selectedSlot ? '#000' : COLORS.textMutedDark }
                             ]}>
-                                {rank === '2' ? 'Book with Reason' : 'Confirm Booking'}
+                                {rank === '2' ? 'Confirm and Book' : 'Confirm Booking'}
                             </Text>
                         )}
                     </TouchableOpacity>

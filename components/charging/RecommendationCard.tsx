@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     bookButton: {
-        backgroundColor: COLORS.brandBlue,
+        backgroundColor: '#000',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 100,
@@ -194,10 +194,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     primaryBookButton: {
-        backgroundColor: '#000',
+        backgroundColor: COLORS.brandBlue,
     },
-    bookText: { color: '#000', fontWeight: '800', fontSize: 13 },
-    primaryBookText: { color: COLORS.brandBlue },
+    bookText: { color: COLORS.brandBlue, fontWeight: '800', fontSize: 13 },
+    primaryBookText: { color: '#000' },
     actionRow: {
         flexDirection: 'row',
         gap: SPACING.sm,

@@ -22,7 +22,7 @@ const STROKE = 16;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '11';
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '5';
 const POLL_INTERVAL = Number(process.env.EXPO_PUBLIC_SESSION_POLL_INTERVAL ?? 30000);
 
 export default function B2CSession() {
@@ -70,6 +70,16 @@ export default function B2CSession() {
 
     // Fetch session on mount — auto-start if already live
     useEffect(() => {
+        // Reset states for a fresh session
+        setSessionEnded(false);
+        setRatingSubmitted(false);
+        setIsCharging(false);
+        setElapsed(0);
+        setStationRating(0);
+        setAppRating(0);
+        setSessionData(null);
+        sliderPos.value = 0;
+
         if (!sessionId) { setSessionLoading(false); return; }
         (async () => {
             try {
@@ -203,7 +213,16 @@ export default function B2CSession() {
         if (actionLoading) return;
         setActionLoading(true);
         try {
-            if (sessionId) await stopSession(sessionId);
+            if (sessionId) {
+                const result = await stopSession(sessionId);
+                if (result) {
+                    setSessionData(result);
+                    if (result.current_soc) {
+                        setChargePercent(result.current_soc);
+                        progress.value = result.current_soc / 100;
+                    }
+                }
+            }
         } catch (err: any) {
             console.error('[B2C] stopSession API failed. Stopping locally.', {
                 endpoint: `PATCH /sessions/${sessionId}/stop`,
@@ -247,7 +266,7 @@ export default function B2CSession() {
                         <GlassCard style={styles.ratingInner as any} intensity={30}>
                             <Zap size={48} color={COLORS.successGreen} />
                             <Text style={[styles.ratingTitle, { color: textPrimary }]}>Session Complete</Text>
-                            <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost}</Text>
+                            <Text style={[styles.ratingCost, { color: COLORS.brandBlue }]}>₹{estimatedCost} charged</Text>
                             <Text style={[styles.ratingKwh, { color: textSecondary }]}>{typeof kwhDelivered === 'number' ? kwhDelivered.toFixed(2) : kwhDelivered} kWh delivered</Text>
 
 

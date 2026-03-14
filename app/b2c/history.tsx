@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, FlatList, Text, TouchableOpacity, Alert, Pressable, ActivityIndicator, Platform, Linking, Modal, TextInput } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Clock, ThumbsUp, ThumbsDown, MapPin, CheckCircle, Info, XCircle, Play, AlertTriangle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../utils/theme';
@@ -13,6 +13,8 @@ import { stopSession, getSessionsByVehicle } from '../../services/session.servic
 import { format } from 'date-fns';
 
 const TABS = ['Active', 'Past'];
+
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID ?? '5';
 
 type HistoryItem = {
     id: string;
@@ -40,12 +42,33 @@ export default function HistoryScreen() {
     const router = useRouter();
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
-    const [activeTab, setActiveTab] = useState('Active');
+    const params = useLocalSearchParams<{ refresh?: string, tab?: string }>();
+    const [activeTab, setActiveTab] = useState(params.tab || 'Active');
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [items, setItems] = useState<HistoryItem[]>([]);
     const [cancelTarget, setCancelTarget] = useState<HistoryItem | null>(null);
     const [cancelling, setCancelling] = useState(false);
+
+    const { myVehicle, currentVehicleId } = useVehicleStore();
+
+    // Update tab if params change
+    useEffect(() => {
+        if (params.tab) {
+            setActiveTab(params.tab);
+        }
+    }, [params.tab, params.refresh]);
+
+    // Polling for active sessions/bookings
+    useEffect(() => {
+        let interval: any;
+        if (activeTab === 'Active') {
+            interval = setInterval(() => {
+                fetchData(true);
+            }, 10000); // Poll every 10 seconds for active tab
+        }
+        return () => clearInterval(interval);
+    }, [activeTab, currentVehicleId]);
 
     const bg = isDark ? COLORS.darkBg : COLORS.lightBg;
     const textPrimary = isDark ? COLORS.textPrimaryDark : COLORS.textPrimaryLight;
@@ -54,10 +77,12 @@ export default function HistoryScreen() {
 
     const fetchData = async (forceRefresh: boolean = false) => {
         setLoading(true);
+        // Clear items to ensure no stale data or duplicates are shown while loading
+        setItems([]);
         try {
             if (activeTab === 'Active') {
                 const [pendingBookings, activeSessions] = await Promise.all([
-                    getPendingBookings(undefined, forceRefresh).catch(err => {
+                    getPendingBookings(DEFAULT_USER_ID, forceRefresh).catch(err => {
                         console.error('[B2C] Failed to fetch pending bookings:', err?.response?.data || err?.message);
                         return [];
                     }),
@@ -66,7 +91,7 @@ export default function HistoryScreen() {
                             console.error('[B2C] Failed to fetch active sessions:', err?.response?.data || err?.message);
                             return [];
                         })
-                        : getUserSessions(undefined, 'active', forceRefresh).catch(err => {
+                        : getUserSessions(DEFAULT_USER_ID, 'active', forceRefresh).catch(err => {
                             console.error('[B2C] Failed to fetch active sessions:', err?.response?.data || err?.message);
                             return [];
                         }),
@@ -77,7 +102,7 @@ export default function HistoryScreen() {
                     if (b.booking_time) {
                         try {
                             timeLabel = format(new Date(b.booking_time), 'hh:mm a');
-                        } catch {}
+                        } catch { }
                     }
                     return {
                         id: String(b.id),
@@ -116,17 +141,14 @@ export default function HistoryScreen() {
                 });
                 setItems(merged);
             } else {
-                const sessions = await getUserSessions(undefined, 'completed', forceRefresh).catch(err => {
+                const sessions = await getUserSessions(DEFAULT_USER_ID, 'completed', forceRefresh).catch(err => {
                     console.error('[B2C] Failed to fetch completed sessions:', err?.response?.data || err?.message);
                     return [];
                 });
                 const mappedItems: HistoryItem[] = sessions.map((s: any) => {
                     let duration = 'N/A';
-                    if (s.elapsed_seconds) {
-                        const totalMins = Math.round(s.elapsed_seconds / 60);
-                        const hrs = Math.floor(totalMins / 60);
-                        const mins = totalMins % 60;
-                        duration = hrs > 0 ? `${hrs}h ${mins}m` : `${totalMins}m`;
+                    if (s.elapsed_seconds !== undefined && s.elapsed_seconds !== null) {
+                        duration = `${s.elapsed_seconds}`;
                     } else if (s.start_time && s.end_time) {
                         const mins = Math.round((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000);
                         duration = `${mins} min`;
@@ -168,6 +190,7 @@ export default function HistoryScreen() {
 
     useFocusEffect(
         React.useCallback(() => {
+            // Always fetch fresh data from API when navigating to this screen
             fetchData(true);
         }, [activeTab])
     );
@@ -215,8 +238,6 @@ export default function HistoryScreen() {
             fetchData(true);
         }
     };
-
-    const { myVehicle, currentVehicleId } = useVehicleStore();
 
     const getSessionParams = (item: HistoryItem) => {
         const bl = myVehicle?.batteryLevel != null ? String(myVehicle.batteryLevel) : undefined;
@@ -326,11 +347,11 @@ export default function HistoryScreen() {
                                         <Text style={[styles.gridValue, { color: textPrimary }]}>{item.connectorId}</Text>
                                     </View>
                                 )}
-                                {item.estimatedCompletion ? (
+                                {item.status ? (
                                     <View style={styles.gridItem}>
                                         <CheckCircle size={12} color={COLORS.successGreen} />
                                         <Text style={[styles.gridLabel, { color: textSecondary }]}>Status</Text>
-                                        <Text style={[styles.gridValue, { color: COLORS.successGreen }]}>{item.estimatedCompletion}</Text>
+                                        <Text style={[styles.gridValue, { color: COLORS.successGreen }]}>{item.status}</Text>
                                     </View>
                                 ) : null}
                             </View>
